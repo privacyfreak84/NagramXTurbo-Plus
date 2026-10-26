@@ -13,7 +13,6 @@ import org.telegram.tgnet.TLRPC
 import org.telegram.ui.Components.TranslateAlert2
 import tw.nekomimi.nekogram.llm.LlmConfig
 import tw.nekomimi.nekogram.llm.net.OpenAICompatClient
-import tw.nekomimi.nekogram.llm.preset.PresetRegistry
 import tw.nekomimi.nekogram.translate.HTMLKeeper
 import tw.nekomimi.nekogram.translate.Translator
 import tw.nekomimi.nekogram.translate.code2Locale
@@ -146,10 +145,7 @@ object LLMTranslator : Translator {
                     AndroidUtil.showErrorDialog(e)
                 }
                 if (retryCount >= MAX_RETRY) {
-                    if (BuildVars.LOGS_ENABLED) {
-                        AndroidUtil.showErrorDialog("Max retry count reached due to network errors, falling back to GoogleAppTranslator")
-                    }
-                    return GoogleAppTranslator.doTranslate(from, to, query, entities)
+                    throw e
                 }
                 val waitTimeMillis = backoffDelayMillis(retryCount)
                 delay(waitTimeMillis.milliseconds)
@@ -157,15 +153,12 @@ object LLMTranslator : Translator {
                 throw e
             } catch (e: Exception) {
                 if (BuildVars.LOGS_ENABLED) {
-                    AndroidUtil.showErrorDialog("Error during LLM translation, falling back to GoogleAppTranslator.\n$e")
+                    AndroidUtil.showErrorDialog("LLM translation failed.\n$e")
                 }
-                return GoogleAppTranslator.doTranslate(from, to, query, entities)
+                throw IOException("LLM translation failed", e)
             }
         }
-        if (BuildVars.LOGS_ENABLED) {
-            AndroidUtil.showErrorDialog("Max retry count reached, falling back to GoogleAppTranslator")
-        }
-        return GoogleAppTranslator.doTranslate(from, to, query, entities)
+        throw IOException("LLM translation failed after $MAX_RETRY retries")
     }
 
     @Throws(IOException::class, RateLimitException::class, UnsupportedOperationException::class)
@@ -210,7 +203,7 @@ object LLMTranslator : Translator {
         }
         FileLog.d("Requesting LLM API with model: $model, messages: $messages")
 
-
+        val response = OpenAICompatClient.chatCompletions(apiUrl, apiKey, model, messages)
 
         if (!response.isSuccess) {
             val code = response.httpCode()
