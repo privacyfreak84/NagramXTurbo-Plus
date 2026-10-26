@@ -105,17 +105,6 @@ import com.android.billingclient.api.BillingFlowParams;
 import com.android.billingclient.api.ProductDetails;
 import com.android.billingclient.api.Purchase;
 import com.android.billingclient.api.QueryProductDetailsParams;
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.auth.api.signin.GoogleSignInClient;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.common.api.ApiException;
-// import com.google.android.gms.safetynet.SafetyNet;
-// import com.google.android.gms.tasks.Task;
-// import com.google.android.play.core.integrity.IntegrityManager;
-// import com.google.android.play.core.integrity.IntegrityManagerFactory;
-// import com.google.android.play.core.integrity.IntegrityTokenRequest;
-// import com.google.android.play.core.integrity.IntegrityTokenResponse;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -177,7 +166,6 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.LinkPath;
 import org.telegram.ui.Components.LinkSpanDrawable;
 import org.telegram.ui.Components.LoadingDrawable;
-import org.telegram.ui.Components.LoginOrView;
 import org.telegram.ui.Components.OutlineTextContainerView;
 import org.telegram.ui.Components.Premium.GLIcon.GLIconRenderer;
 import org.telegram.ui.Components.Premium.GLIcon.GLIconTextureView;
@@ -410,7 +398,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private Runnable[] editDoneCallback = new Runnable[2];
     private boolean[] postedEditDoneCallback = new boolean[2];
 
-    private boolean forceDisableSafetyNet;
 
     private static class ProgressView extends View {
 
@@ -1752,43 +1739,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private void fillNextCodeParams(Bundle params, TLRPC.auth_SentCode res) {
         fillNextCodeParams(params, res, true);
     }
-/*
-    private void resendCodeFromSafetyNet(Bundle params, TLRPC.auth_SentCode res, String reason) {
-        if (!isRequestingFirebaseSms) {
-            return;
-        }
-        needHideProgress(false);
-        isRequestingFirebaseSms = false;
-
-        TLRPC.TL_auth_resendCode req = new TLRPC.TL_auth_resendCode();
-        req.phone_number = params.getString("phoneFormated");
-        req.phone_code_hash = res.phone_code_hash;
-        if (reason != null) {
-            req.flags |= 1;
-            req.reason = reason;
-        }
-        ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> {
-            if (response != null && !(((TLRPC.auth_SentCode) response).type instanceof TLRPC.TL_auth_sentCodeTypeFirebaseSms)) {
-                AndroidUtilities.runOnUIThread(() -> fillNextCodeParams(params, (TLRPC.auth_SentCode) response));
-            } else {
-                AndroidUtilities.runOnUIThread(() -> {
-                    if (getParentActivity() == null || getParentActivity().isFinishing() || getContext() == null) {
-                        return;
-                    }
-                    new AlertDialog.Builder(getContext())
-                            .setTitle(getString(R.string.RestorePasswordNoEmailTitle))
-                            .setMessage(getString(R.string.SafetyNetErrorOccurred))
-                            .setPositiveButton(getString(R.string.OK), (dialog, which) -> {
-                                forceDisableSafetyNet = true;
-                                if (currentViewNum != VIEW_PHONE_INPUT) {
-                                    setPage(VIEW_PHONE_INPUT, true, null, true);
-                                }
-                            })
-                            .show();
-                });
-            }
-        }, ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
-    }*/
+*/
 
     public static String errorString(Throwable e) {
         if (e == null) return "NULL";
@@ -1813,7 +1764,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         fillNextCodeParams(params, res, true);
     }
 
-    private boolean isRequestingFirebaseSms;
     private void fillNextCodeParams(Bundle params, TLRPC.auth_SentCode res, boolean animate) {
         if (res instanceof TLRPC.TL_auth_sentCodePaymentRequired) {
             final TLRPC.TL_auth_sentCodePaymentRequired auth = (TLRPC.TL_auth_sentCodePaymentRequired) res;
@@ -1827,122 +1777,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             setPage(VIEW_PAY, true, params, true);
             return;
         }
-        /*if (res.type instanceof TLRPC.TL_auth_sentCodeTypeFirebaseSms && !res.type.verifiedFirebase && !isRequestingFirebaseSms) {
-            if (PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices()) {
-                TLRPC.TL_auth_sentCodeTypeFirebaseSms r = (TLRPC.TL_auth_sentCodeTypeFirebaseSms) res.type;
-                needShowProgress(0);
-                isRequestingFirebaseSms = true;
-                final String phone = params.getString("phoneFormated");
-                if (r.play_integrity_nonce != null) {
-                    IntegrityManager integrityManager = IntegrityManagerFactory.create(getContext());
-                    final String nonce = new String(Base64.encode(r.play_integrity_nonce, Base64.URL_SAFE));
-                    FileLog.d("getting classic integrity with nonce = " + nonce);
-                    Task<IntegrityTokenResponse> integrityTokenResponse = integrityManager.requestIntegrityToken(IntegrityTokenRequest.builder().setNonce(nonce).setCloudProjectNumber(r.play_integrity_project_id).build());
-                    integrityTokenResponse
-                        .addOnSuccessListener(result -> {
-                            final String token = result.token();
-
-                            if (token == null) {
-                                FileLog.d("Resend firebase sms because integrity token = null");
-                                resendCodeFromSafetyNet(params, res, "PLAYINTEGRITY_TOKEN_NULL");
-                                return;
-                            }
-
-                            TLRPC.TL_auth_requestFirebaseSms req = new TLRPC.TL_auth_requestFirebaseSms();
-                            req.phone_number = phone;
-                            req.phone_code_hash = res.phone_code_hash;
-                            req.play_integrity_token = token;
-                            req.flags |= 4;
-
-                            ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> {
-                                if (response instanceof TLRPC.TL_boolTrue) {
-                                    needHideProgress(false);
-                                    isRequestingFirebaseSms = false;
-                                    res.type.verifiedFirebase = true;
-                                    AndroidUtilities.runOnUIThread(() -> fillNextCodeParams(params, res, animate));
-                                } else {
-                                    FileLog.d("{PLAYINTEGRITY_REQUESTFIREBASESMS_FALSE} Resend firebase sms because auth.requestFirebaseSms = false");
-                                    resendCodeFromSafetyNet(params, res, "PLAYINTEGRITY_REQUESTFIREBASESMS_FALSE");
-                                }
-                            }, ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
-                        })
-                        .addOnFailureListener(e -> {
-                            final String reason = "PLAYINTEGRITY_EXCEPTION_" + errorString(e);
-                            FileLog.e("{"+reason+"} Resend firebase sms because integrity threw error", e);
-                            resendCodeFromSafetyNet(params, res, reason);
-                        });
-                } else {
-                    SafetyNet.getClient(ApplicationLoader.applicationContext).attest(res.type.nonce, BuildVars.SAFETYNET_KEY)
-                    .addOnSuccessListener(attestationResponse -> {
-                        String jws = attestationResponse.getJwsResult();
-
-                        if (jws != null) {
-                            TLRPC.TL_auth_requestFirebaseSms req = new TLRPC.TL_auth_requestFirebaseSms();
-                            req.phone_number = phone;
-                            req.phone_code_hash = res.phone_code_hash;
-                            req.safety_net_token = jws;
-                            req.flags |= 1;
-
-                            String[] spl = jws.split("\\.");
-                            if (spl.length > 0) {
-                                try {
-                                    JSONObject obj = new JSONObject(new String(Base64.decode(spl[1].getBytes(StandardCharsets.UTF_8), 0)));
-                                    final boolean basicIntegrity = obj.optBoolean("basicIntegrity");
-                                    final boolean ctsProfileMatch = obj.optBoolean("ctsProfileMatch");
-                                    if (basicIntegrity && ctsProfileMatch) {
-                                        ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> {
-                                            if (response instanceof TLRPC.TL_boolTrue) {
-                                                needHideProgress(false);
-                                                isRequestingFirebaseSms = false;
-                                                res.type.verifiedFirebase = true;
-                                                AndroidUtilities.runOnUIThread(() -> fillNextCodeParams(params, res, animate));
-                                            } else {
-                                                FileLog.d("{SAFETYNET_REQUESTFIREBASESMS_FALSE} Resend firebase sms because auth.requestFirebaseSms = false");
-                                                resendCodeFromSafetyNet(params, res, "SAFETYNET_REQUESTFIREBASESMS_FALSE");
-                                            }
-                                        }, ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
-                                    } else {
-                                        if (!basicIntegrity && !ctsProfileMatch) {
-                                            FileLog.d("{SAFETYNET_BASICINTEGRITY_CTSPROFILEMATCH_FALSE} Resend firebase sms because ctsProfileMatch = false and basicIntegrity = false");
-                                            resendCodeFromSafetyNet(params, res, "SAFETYNET_BASICINTEGRITY_CTSPROFILEMATCH_FALSE");
-                                        } else if (!basicIntegrity) {
-                                            FileLog.d("{SAFETYNET_BASICINTEGRITY_FALSE} Resend firebase sms because basicIntegrity = false");
-                                            resendCodeFromSafetyNet(params, res, "SAFETYNET_BASICINTEGRITY_FALSE");
-                                        } else if (!ctsProfileMatch) {
-                                            FileLog.d("{SAFETYNET_CTSPROFILEMATCH_FALSE} Resend firebase sms because ctsProfileMatch = false");
-                                            resendCodeFromSafetyNet(params, res, "SAFETYNET_CTSPROFILEMATCH_FALSE");
-                                        }
-                                    }
-                                } catch (JSONException e) {
-                                    FileLog.e(e);
-
-                                    FileLog.d("{SAFETYNET_JSON_EXCEPTION} Resend firebase sms because of exception");
-                                    resendCodeFromSafetyNet(params, res, "SAFETYNET_JSON_EXCEPTION");
-                                }
-                            } else {
-                                FileLog.d("{SAFETYNET_CANT_SPLIT} Resend firebase sms because can't split JWS token");
-                                resendCodeFromSafetyNet(params, res, "SAFETYNET_CANT_SPLIT");
-                            }
-                        } else {
-                            FileLog.d("{SAFETYNET_NULL_JWS} Resend firebase sms because JWS = null");
-                            resendCodeFromSafetyNet(params, res, "SAFETYNET_NULL_JWS");
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        FileLog.e(e);
-
-                        final String reason = "SAFETYNET_EXCEPTION_" + errorString(e);
-                        FileLog.d("{"+reason+"} Resend firebase sms because of safetynet exception");
-                        resendCodeFromSafetyNet(params, res, reason);
-                    });
-                }
-            } else {
-                FileLog.d("{GOOGLE_PLAY_SERVICES_NOT_AVAILABLE} Resend firebase sms because firebase is not available");
-                resendCodeFromSafetyNet(params, res, "GOOGLE_PLAY_SERVICES_NOT_AVAILABLE");
-            }
-            return;
-        }*/
-
         params.putString("phoneHash", res.phone_code_hash);
         if (res.next_type instanceof TLRPC.TL_auth_codeTypeCall) {
             params.putInt("nextType", AUTH_TYPE_CALL);
@@ -1972,10 +1806,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 params.putInt("type", AUTH_TYPE_FLASH_CALL);
                 params.putString("pattern", res.type.pattern);
                 setPage(VIEW_CODE_FLASH_CALL, animate, params, false);
-            } else if (res.type instanceof TLRPC.TL_auth_sentCodeTypeSms || res.type instanceof TLRPC.TL_auth_sentCodeTypeFirebaseSms) {
+            } else if (res.type instanceof TLRPC.TL_auth_sentCodeTypeSms) {
                 params.putInt("type", AUTH_TYPE_SMS);
                 params.putInt("length", res.type.length);
-                params.putBoolean("firebase", res.type instanceof TLRPC.TL_auth_sentCodeTypeFirebaseSms);
                 setPage(VIEW_CODE_SMS, animate, params, false);
             } else if (res.type instanceof TLRPC.TL_auth_sentCodeTypeFragmentSms) {
                 params.putInt("type", AUTH_TYPE_FRAGMENT_SMS);
@@ -1988,10 +1821,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 params.putString("prefix", res.type.prefix);
                 setPage(VIEW_CODE_MISSED_CALL, animate, params, false);
             } else if (res.type instanceof TLRPC.TL_auth_sentCodeTypeSetUpEmailRequired) {
-                params.putBoolean("googleSignInAllowed", res.type.google_signin_allowed);
                 setPage(VIEW_ADD_EMAIL, animate, params, false);
             } else if (res.type instanceof TLRPC.TL_auth_sentCodeTypeEmailCode) {
-                params.putBoolean("googleSignInAllowed", res.type.google_signin_allowed);
                 params.putString("emailPattern", res.type.email_pattern);
                 params.putInt("length", res.type.length);
                 params.putInt("nextPhoneLoginDate", res.type.next_phone_login_date);
@@ -2939,7 +2770,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         @Override
         public void onNextPressed(String code) {
-            if (getParentActivity() == null || nextPressed || isRequestingFirebaseSms) {
+            if (getParentActivity() == null || nextPressed) {
                 return;
             }
 
@@ -3170,10 +3001,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             TLRPC.TL_codeSettings settings = new TLRPC.TL_codeSettings();
             settings.allow_flashcall = simcardAvailable && allowCall && allowCancelCall && allowReadCallLog;
             settings.allow_missed_call = simcardAvailable && allowCall;
-            settings.allow_app_hash = settings.allow_firebase = PushListenerController.getProvider().hasServices();
-            if (forceDisableSafetyNet || TextUtils.isEmpty(BuildVars.SAFETYNET_KEY)) {
-                settings.allow_firebase = false;
-            }
+            settings.allow_app_hash = false;
+            settings.allow_firebase = false;
 
             ArrayList<TLRPC.TL_auth_authorization> loginTokens = AuthTokensHelper.getSavedLogInTokens();
             if (loginTokens != null) {
@@ -3331,9 +3160,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                         }
                     }
                 }
-                if (!isRequestingFirebaseSms) {
-                    needHideProgress(false);
-                }
+                needHideProgress(false);
             }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin | ConnectionsManager.RequestFlagTryDifferentDc | ConnectionsManager.RequestFlagEnableUnauthorized);
             needShowProgress(reqId);
         }
@@ -3905,9 +3732,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             timeText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             timeText.setGravity(Gravity.TOP | Gravity.LEFT);
             timeText.setOnClickListener(v -> {
-//                if (isRequestingFirebaseSms || isResendingCode) {
-//                    return;
-//                }
                 if (time > 0 && timeTimer != null) {
                     return;
                 }
@@ -4270,7 +4094,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         }
 
         private void resendCode() {
-            if (nextPressed || isResendingCode || isRequestingFirebaseSms) {
+            if (nextPressed || isResendingCode) {
                 return;
             }
 
@@ -6013,8 +5837,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         private TextView titleView;
         private TextView subtitleView;
-        private TextView signInWithGoogleView;
-        private LoginOrView loginOrView;
         private RLottieImageView inboxImageView;
 
         private Bundle currentParams;
@@ -6023,7 +5845,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         private String phone, emailPhone;
         private String requestPhone, phoneHash;
 
-        private GoogleSignInAccount googleAccount;
 
         public LoginActivitySetupEmail(Context context) {
             super(context);
@@ -6080,72 +5901,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
             addView(emailOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 58, 16, 24, 16, 0));
 
-            signInWithGoogleView = new TextView(context);
-            signInWithGoogleView.setGravity(Gravity.LEFT);
-            signInWithGoogleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            signInWithGoogleView.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
-            signInWithGoogleView.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
-            signInWithGoogleView.setMaxLines(2);
-
-            SpannableStringBuilder str = new SpannableStringBuilder("d ");
-            Drawable dr = ContextCompat.getDrawable(context, com.google.android.gms.base.R.drawable.googleg_standard_color_18);
-            dr.setBounds(0, AndroidUtilities.dp(9), AndroidUtilities.dp(18), AndroidUtilities.dp(18 + 9));
-            str.setSpan(new ImageSpan(dr, ImageSpan.ALIGN_BOTTOM), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            str.setSpan(new ReplacementSpan() {
-                @Override
-                public int getSize(@NonNull Paint paint, CharSequence text, int start, int end, @Nullable Paint.FontMetricsInt fm) {
-                    return AndroidUtilities.dp(12);
-                }
-
-                @Override
-                public void draw(@NonNull Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint) {}
-            }, 1, 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            str.append(getString(R.string.SignInWithGoogle));
-            signInWithGoogleView.setText(str);
-
-            loginOrView = new LoginOrView(context);
-
-            Space space = new Space(context);
-            addView(space, LayoutHelper.createLinear(0, 0, 1f));
-
-            FrameLayout bottomContainer = new FrameLayout(context);
-            bottomContainer.addView(signInWithGoogleView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 0, 0, 0, 24));
-            bottomContainer.addView(loginOrView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 16, Gravity.BOTTOM | Gravity.LEFT, 0, 0, 0, 70));
-            loginOrView.setMeasureAfter(signInWithGoogleView);
-            addView(bottomContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-            VerticalPositionAutoAnimator.attach(bottomContainer);
-
-            bottomContainer.setOnClickListener(view -> {
-                NotificationCenter.getGlobalInstance().addObserver(new NotificationCenter.NotificationCenterDelegate() {
-                    @Override
-                    public void didReceivedNotification(int id, int account, Object... args) {
-                        int request = (int) args[0];
-                        int result = (int) args[1];
-                        Intent data = (Intent) args[2];
-                        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.onActivityResultReceived);
-
-                        if (request == BasePermissionsActivity.REQUEST_CODE_SIGN_IN_WITH_GOOGLE) {
-                            try {
-                                googleAccount = GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException.class);
-                                onNextPressed(null);
-                            } catch (ApiException e) {
-                                FileLog.e(e);
-                            }
-                        }
-                    }
-                }, NotificationCenter.onActivityResultReceived);
-
-                GoogleSignInClient googleClient = GoogleSignIn.getClient(getContext(), new GoogleSignInOptions.Builder()
-                        .requestIdToken(BuildVars.GOOGLE_AUTH_CLIENT_ID)
-                        .requestEmail()
-                        .build());
-                googleClient.signOut().addOnCompleteListener(command -> {
-                    if (getParentActivity() == null || getParentActivity().isFinishing()) {
-                        return;
-                    }
-                    getParentActivity().startActivityForResult(googleClient.getSignInIntent(), BasePermissionsActivity.REQUEST_CODE_SIGN_IN_WITH_GOOGLE);
-                });
-            });
         }
 
         @Override
@@ -6154,8 +5909,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             subtitleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
             subtitleView.setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn));
             emailField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-            signInWithGoogleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
-            loginOrView.updateColors();
 
             emailOutlineView.invalidate();
         }
@@ -6182,9 +5935,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             requestPhone = currentParams.getString("phoneFormated");
             phoneHash = currentParams.getString("phoneHash");
 
-            int v = params.getBoolean("googleSignInAllowed") && PushListenerController.getProvider().hasServices() ? VISIBLE : GONE;
-            loginOrView.setVisibility(v);
-            signInWithGoogleView.setVisibility(v);
 
             showKeyboard(emailField);
             emailField.requestFocus();
@@ -6212,7 +5962,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 return;
             }
 
-            String email = googleAccount != null ? googleAccount.getEmail() : emailField.getText().toString();
+            String email = emailField.getText().toString();
             Bundle params = new Bundle();
             params.putString("phone", phone);
             params.putString("ephone", emailPhone);
@@ -6220,44 +5970,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             params.putString("phoneHash", phoneHash);
             params.putString("email", email);
             params.putBoolean("setup", true);
-
-            if (googleAccount != null) {
-                TL_account.verifyEmail verifyEmail = new TL_account.verifyEmail();
-                if (activityMode == MODE_CHANGE_LOGIN_EMAIL) {
-                    verifyEmail.purpose = new TLRPC.TL_emailVerifyPurposeLoginChange();
-                } else {
-                    TLRPC.TL_emailVerifyPurposeLoginSetup purpose = new TLRPC.TL_emailVerifyPurposeLoginSetup();
-                    purpose.phone_number = requestPhone;
-                    purpose.phone_code_hash = phoneHash;
-                    verifyEmail.purpose = purpose;
-                }
-                TLRPC.TL_emailVerificationGoogle verificationGoogle = new TLRPC.TL_emailVerificationGoogle();
-                verificationGoogle.token = googleAccount.getIdToken();
-                verifyEmail.verification = verificationGoogle;
-
-                googleAccount = null;
-                ConnectionsManager.getInstance(currentAccount).sendRequest(verifyEmail, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
-                    if (response instanceof TL_account.TL_emailVerified && activityMode == MODE_CHANGE_LOGIN_EMAIL) {
-                        finishFragment();
-                        emailChangeFinishCallback.run();
-                    } else if (response instanceof TL_account.TL_emailVerifiedLogin) {
-                        TL_account.TL_emailVerifiedLogin emailVerifiedLogin = (TL_account.TL_emailVerifiedLogin) response;
-
-                        params.putString("email", emailVerifiedLogin.email);
-                        fillNextCodeParams(params, emailVerifiedLogin.sent_code);
-                    } else if (error != null) {
-                        if (error.text.contains("EMAIL_NOT_ALLOWED")) {
-                            needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString(R.string.EmailNotAllowed));
-                        } else if (error.text.contains("EMAIL_TOKEN_INVALID")) {
-                            needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString(R.string.EmailTokenInvalid));
-                        } else if (error.code != -1000) {
-                            AlertsCreator.processError(currentAccount, error, LoginActivity.this, verifyEmail);
-                        }
-                    }
-                }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
-
-                return;
-            }
 
             if (TextUtils.isEmpty(email)) {
                 onPasscodeError(false);
@@ -6346,20 +6058,17 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         private CodeFieldContainer codeFieldContainer;
         private TextView titleView;
         private TextView confirmTextView;
-        private TextView signInWithGoogleView;
         private FrameLayout resendFrameLayout;
         private TextView resendCodeView;
         private FrameLayout cantAccessEmailFrameLayout;
         private TextView cantAccessEmailView;
         private TextView emailResetInView;
         private TextView wrongCodeView;
-        private LoginOrView loginOrView;
         private RLottieImageView inboxImageView;
 
         private boolean resetRequestPending;
         private Bundle currentParams;
         private boolean nextPressed;
-        private GoogleSignInAccount googleAccount;
 
         private int resetAvailablePeriod, resetPendingDate;
         private String phone, emailPhone, email;
@@ -6425,61 +6134,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             };
 
             addView(codeFieldContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 42, Gravity.CENTER_HORIZONTAL, 0, setup ? 48 : 32, 0, 0));
-
-            signInWithGoogleView = new TextView(context);
-            signInWithGoogleView.setGravity(Gravity.CENTER);
-            signInWithGoogleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            signInWithGoogleView.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
-            signInWithGoogleView.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
-            signInWithGoogleView.setMaxLines(2);
-
-            SpannableStringBuilder str = new SpannableStringBuilder("d ");
-            Drawable dr = ContextCompat.getDrawable(context, com.google.android.gms.base.R.drawable.googleg_standard_color_18);
-            dr.setBounds(0, AndroidUtilities.dp(9), AndroidUtilities.dp(18), AndroidUtilities.dp(18 + 9));
-            str.setSpan(new ImageSpan(dr, ImageSpan.ALIGN_BOTTOM), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            str.setSpan(new ReplacementSpan() {
-                @Override
-                public int getSize(@NonNull Paint paint, CharSequence text, int start, int end, @Nullable Paint.FontMetricsInt fm) {
-                    return AndroidUtilities.dp(12);
-                }
-
-                @Override
-                public void draw(@NonNull Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint) {}
-            }, 1, 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            str.append(getString(R.string.SignInWithGoogle));
-            signInWithGoogleView.setText(str);
-
-            signInWithGoogleView.setOnClickListener(view -> {
-                NotificationCenter.getGlobalInstance().addObserver(new NotificationCenter.NotificationCenterDelegate() {
-                    @Override
-                    public void didReceivedNotification(int id, int account, Object... args) {
-                        int request = (int) args[0];
-                        int result = (int) args[1];
-                        Intent data = (Intent) args[2];
-                        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.onActivityResultReceived);
-
-                        if (request == BasePermissionsActivity.REQUEST_CODE_SIGN_IN_WITH_GOOGLE) {
-                            try {
-                                googleAccount = GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException.class);
-                                onNextPressed(null);
-                            } catch (ApiException e) {
-                                FileLog.e(e);
-                            }
-                        }
-                    }
-                }, NotificationCenter.onActivityResultReceived);
-
-                GoogleSignInClient googleClient = GoogleSignIn.getClient(getContext(), new GoogleSignInOptions.Builder()
-                                .requestIdToken(BuildVars.GOOGLE_AUTH_CLIENT_ID)
-                                .requestEmail()
-                                .build());
-                googleClient.signOut().addOnCompleteListener(command -> {
-                    if (getParentActivity() == null) {
-                        return;
-                    }
-                    getParentActivity().startActivityForResult(googleClient.getSignInIntent(), BasePermissionsActivity.REQUEST_CODE_SIGN_IN_WITH_GOOGLE);
-                });
-            });
 
             cantAccessEmailFrameLayout = new FrameLayout(context);
             AndroidUtilities.updateViewVisibilityAnimated(cantAccessEmailFrameLayout, activityMode != MODE_CHANGE_LOGIN_EMAIL && !isSetup, 1f, false);
@@ -6594,9 +6248,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             });
             AndroidUtilities.updateViewVisibilityAnimated(resendCodeView, false, 1f, false);
 
-            loginOrView = new LoginOrView(context);
-            VerticalPositionAutoAnimator.attach(loginOrView);
-
             errorViewSwitcher = new ViewSwitcher(context) {
                 @Override
                 protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -6629,8 +6280,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             } else {
                 bottomContainer.addView(errorViewSwitcher, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
                 bottomContainer.addView(cantAccessEmailFrameLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
-                bottomContainer.addView(loginOrView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 16, Gravity.CENTER, 0, 0, 0, 16));
-                bottomContainer.addView(signInWithGoogleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 0, 0, 0, 16));
             }
             addView(bottomContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1f));
         }
@@ -6680,8 +6329,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         public void updateColors() {
             titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             confirmTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
-            signInWithGoogleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
-            loginOrView.updateColors();
             resendCodeView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
             cantAccessEmailView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
             emailResetInView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
@@ -6701,10 +6348,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             AndroidUtilities.updateViewVisibilityAnimated(resendCodeView, show);
             AndroidUtilities.updateViewVisibilityAnimated(cantAccessEmailFrameLayout, !show && activityMode != MODE_CHANGE_LOGIN_EMAIL && !isSetup);
 
-            if (loginOrView.getVisibility() != GONE) {
-                loginOrView.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 16, Gravity.CENTER, 0, 0, 0, show ? 8 : 16));
-                loginOrView.requestLayout();
-            }
         }
 
         @Override
@@ -6797,9 +6440,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 confirmTextView.setText(AndroidUtilities.formatSpannable(getString(R.string.CheckYourEmailSubtitle), confirmText));
             }
 
-            int v = params.getBoolean("googleSignInAllowed") && PushListenerController.getProvider().hasServices() ? VISIBLE : GONE;
-            loginOrView.setVisibility(v);
-            signInWithGoogleView.setVisibility(v);
 
             showKeyboard(codeFieldContainer.codeField[0]);
             codeFieldContainer.requestFocus();
@@ -6935,7 +6575,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             }
 
             code = codeFieldContainer.getCode();
-            if (code.length() == 0 && googleAccount == null) {
+            if (code.length() == 0) {
                 onPasscodeError(false);
                 return;
             }
@@ -6964,15 +6604,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 TLRPC.TL_auth_signIn request = new TLRPC.TL_auth_signIn();
                 request.phone_number = requestPhone;
                 request.phone_code_hash = phoneHash;
-                if (googleAccount != null) {
-                    TLRPC.TL_emailVerificationGoogle verification = new TLRPC.TL_emailVerificationGoogle();
-                    verification.token = googleAccount.getIdToken();
-                    request.email_verification = verification;
-                } else {
-                    TLRPC.TL_emailVerificationCode verification = new TLRPC.TL_emailVerificationCode();
-                    verification.code = code;
-                    request.email_verification = verification;
-                }
+                TLRPC.TL_emailVerificationCode verification = new TLRPC.TL_emailVerificationCode();
+                verification.code = code;
+                request.email_verification = verification;
                 request.flags |= 2;
                 req = request;
             }
@@ -7079,15 +6713,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                         }
                     }
                 }
-                googleAccount = null;
             }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
         }
 
         private void animateSuccess(Runnable callback) {
-            if (googleAccount != null) {
-                callback.run();
-                return;
-            }
             for (int i = 0; i < codeFieldContainer.codeField.length; i++) {
                 int finalI = i;
                 codeFieldContainer.postDelayed(()-> codeFieldContainer.codeField[finalI].animateSuccessProgress(1f), i * 75L);
@@ -9394,9 +9023,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             timeText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             timeText.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
             timeText.setOnClickListener(v -> {
-//                if (isRequestingFirebaseSms || isResendingCode) {
-//                    return;
-//                }
                 if (time > 0 && timeTimer != null) {
                     return;
                 }
@@ -9595,7 +9221,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             nextCodeAuth = null;
             nextPressed = false;
             isResendingCode = false;
-            isRequestingFirebaseSms = false;
             timeText.invalidate();
 
             final int a = currentType == AUTH_TYPE_WORD ? 0 : 1;
@@ -9798,7 +9423,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
 
         private void resendCode() {
-            if (nextPressed || isResendingCode || isRequestingFirebaseSms) {
+            if (nextPressed || isResendingCode) {
                 return;
             }
 
