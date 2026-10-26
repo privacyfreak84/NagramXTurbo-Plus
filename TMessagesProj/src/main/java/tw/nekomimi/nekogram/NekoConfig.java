@@ -209,6 +209,10 @@ public class NekoConfig {
 
     public static void init() {
         loadConfig(false);
+        // Provider IDs 1 and 2 used to select Google translation. Use Yandex instead.
+        if (translationProvider.Int() == 1 || translationProvider.Int() == 2) {
+            translationProvider.setConfigInt(3);
+        }
     }
 
     public static ConfigItem addConfig(String k, int t, Object d) {
