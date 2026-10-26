@@ -2925,7 +2925,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                 req.hash = phoneHash;
                                 req.settings = new TLRPC.TL_codeSettings();
                                 req.settings.allow_flashcall = false;
-                                req.settings.allow_app_hash = req.settings.allow_firebase = PushListenerController.getProvider().hasServices();
+                                req.settings.allow_app_hash = req.settings.allow_firebase = false; // no Play Services SMS Retriever / Firebase phone auth in this build
                                 SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
                                 if (req.settings.allow_app_hash) {
                                     preferences.edit().putString("sms_hash", BuildVars.getSmsHash()).apply();
