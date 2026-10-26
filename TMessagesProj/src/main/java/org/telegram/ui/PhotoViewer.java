@@ -153,9 +153,6 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener;
 import androidx.media3.common.VideoSize;
 import com.google.android.gms.cast.framework.CastContext;
-import com.google.android.gms.vision.Frame;
-import com.google.android.gms.vision.face.Face;
-import com.google.android.gms.vision.face.FaceDetector;
 
 import org.jetbrains.annotations.NotNull;
 import org.telegram.messenger.AccountInstance;
@@ -12758,41 +12755,41 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             return;
         }
         Utilities.globalQueue.postRunnable(() -> {
-            FaceDetector faceDetector = null;
+            Bitmap rgbBitmap = null;
             try {
-                faceDetector = new FaceDetector.Builder(ApplicationLoader.applicationContext)
-                        .setMode(FaceDetector.FAST_MODE)
-                        .setLandmarkType(FaceDetector.NO_LANDMARKS)
-                        .setTrackingEnabled(false).build();
-                if (faceDetector.isOperational()) {
-                    Frame frame = new Frame.Builder().setBitmap(bitmap.bitmap).setRotation(orientation).build();
-                    SparseArray<Face> faces = faceDetector.detect(frame);
-                    boolean hasFaces = faces != null && faces.size() != 0;
-                    AndroidUtilities.runOnUIThread(() -> {
-                        String imageKey = centerImage.getImageKey();
-                        if (key.equals(imageKey)) {
-                            currentImageHasFace = hasFaces ? 1 : 0;
-                            currentImageFaceKey = key;
-                        }
-                    });
-                } else {
-                    if (BuildVars.LOGS_ENABLED) {
-                        FileLog.e("face detection is not operational");
-                    }
-                    AndroidUtilities.runOnUIThread(() -> {
-                        bitmap.release();
-                        String imageKey = centerImage.getImageKey();
-                        if (key.equals(imageKey)) {
-                            currentImageHasFace = 2;
-                            currentImageFaceKey = key;
-                        }
-                    });
+                Bitmap source = bitmap.bitmap;
+                int width = source.getWidth() & ~1;
+                int height = source.getHeight();
+                if (width < 2 || height < 1) {
+                    throw new IllegalArgumentException("Image is too small for face detection");
                 }
+                rgbBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+                android.graphics.Canvas canvas = new android.graphics.Canvas(rgbBitmap);
+                android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+                android.graphics.Rect rect = new android.graphics.Rect(0, 0, width, height);
+                canvas.drawBitmap(source, rect, rect, paint);
+
+                android.media.FaceDetector detector = new android.media.FaceDetector(width, height, 4);
+                android.media.FaceDetector.Face[] faces = new android.media.FaceDetector.Face[4];
+                boolean hasFaces = detector.findFaces(rgbBitmap, faces) > 0;
+                final int result = hasFaces ? 1 : 0;
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (key.equals(centerImage.getImageKey())) {
+                        currentImageHasFace = result;
+                        currentImageFaceKey = key;
+                    }
+                });
             } catch (Exception e) {
                 FileLog.e(e);
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (key.equals(centerImage.getImageKey())) {
+                        currentImageHasFace = 2;
+                        currentImageFaceKey = key;
+                    }
+                });
             } finally {
-                if (faceDetector != null) {
-                    faceDetector.release();
+                if (rgbBitmap != null) {
+                    rgbBitmap.recycle();
                 }
             }
         });
