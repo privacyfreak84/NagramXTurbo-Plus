@@ -17,9 +17,13 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 
-import com.google.android.gms.vision.Frame;
-import com.google.android.gms.vision.barcode.Barcode;
-import com.google.android.gms.vision.barcode.BarcodeDetector;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.Result;
+import com.google.zxing.ResultPoint;
+import com.google.zxing.RGBLuminanceSource;
+import com.google.zxing.common.GlobalHistogramBinarizer;
+import com.google.zxing.qrcode.QRCodeReader;
+
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.MessagesController;
@@ -35,7 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class QRScanner {
 
-    private final AtomicReference<BarcodeDetector> detector = new AtomicReference<>();
+    private final AtomicReference<QRCodeReader> reader = new AtomicReference<>();
     private final AtomicBoolean paused = new AtomicBoolean(false);
 
     private final Utilities.Callback<Detected> listener;
@@ -46,7 +50,7 @@ public class QRScanner {
         this.listener = whenScanned;
         this.prefix = MessagesController.getInstance(UserConfig.selectedAccount).linkPrefix;
         Utilities.globalQueue.postRunnable(() -> {
-            detector.set(new BarcodeDetector.Builder(context).setBarcodeFormats(Barcode.QR_CODE).build());
+            reader.set(new QRCodeReader());
             attach(cameraView);
         });
     }
@@ -64,7 +68,7 @@ public class QRScanner {
 
     public void attach(CameraView cameraView) {
         this.cameraView = cameraView;
-        if (detector.get() == null) return;
+        if (reader.get() == null) return;
 
         if (!paused.get()) {
             Utilities.globalQueue.cancelRunnable(this.process);
@@ -93,7 +97,7 @@ public class QRScanner {
 
     private Bitmap cacheBitmap;
     private final Runnable process = () -> {
-        if (detector.get() == null || cameraView == null || paused.get()) {
+        if (reader.get() == null || cameraView == null || paused.get()) {
             return;
         }
 
@@ -127,36 +131,32 @@ public class QRScanner {
     };
 
     private Detected detect(Bitmap bitmap) {
-        if (bitmap == null) {
-            return null;
-        }
+        if (bitmap == null) return null;
+        final QRCodeReader reader = this.reader.get();
+        if (reader == null) return null;
 
-        final BarcodeDetector detector = this.detector.get();
-        if (detector == null || !detector.isOperational()) {
-            return null;
-        }
-
-        final int w = bitmap.getWidth();
-        final int h = bitmap.getHeight();
-        final Frame frame = new Frame.Builder().setBitmap(bitmap).build();
-        final SparseArray<Barcode> codes = detector.detect(frame);
-
-        for (int i = 0; i < codes.size(); ++i) {
-            final Barcode code = codes.valueAt(i);
-            String link = code.rawValue;
-            if (link == null) continue;
+        final int w = bitmap.getWidth(), h = bitmap.getHeight();
+        int[] pixels = new int[w * h];
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
+        RGBLuminanceSource luminance = new RGBLuminanceSource(w, h, pixels);
+        try {
+            reader.reset();
+            Result result = reader.decode(new BinaryBitmap(new GlobalHistogramBinarizer(luminance)));
+            String link = result.getText();
+            if (link == null) return null;
             link = link.trim();
-            if (!link.startsWith(prefix) && !link.startsWith("https://" + prefix) && !link.startsWith("http://" + prefix)) continue;
-
-            final PointF[] cornerPoints = new PointF[code.cornerPoints.length];
-            for (int j = 0; j < code.cornerPoints.length; ++j) {
-                cornerPoints[j] = new PointF((float) code.cornerPoints[j].x / w, (float) code.cornerPoints[j].y / h);
+            if (!link.startsWith(prefix) && !link.startsWith("https://" + prefix) && !link.startsWith("http://" + prefix)) return null;
+            ResultPoint[] decoded = result.getResultPoints();
+            PointF[] points = decoded == null ? new PointF[0] : new PointF[decoded.length];
+            if (decoded != null) {
+                for (int i = 0; i < decoded.length; ++i) points[i] = new PointF(decoded[i].getX() / w, decoded[i].getY() / h);
             }
-
-            return new Detected(link, cornerPoints);
+            return new Detected(link, points);
+        } catch (Throwable ignored) {
+            return null;
+        } finally {
+            reader.reset();
         }
-
-        return null;
     }
 
     public int getMaxSide() {
@@ -179,10 +179,7 @@ public class QRScanner {
     }
 
     public void detach() {
-        BarcodeDetector detector = this.detector.getAndSet(null);
-        if (detector != null) {
-            detector.release();
-        }
+
     }
 
     public static final class Detected {

@@ -53,9 +53,6 @@ import androidx.dynamicanimation.animation.FloatValueHolder;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 
-import com.google.android.gms.vision.Frame;
-import com.google.android.gms.vision.barcode.Barcode;
-import com.google.android.gms.vision.barcode.BarcodeDetector;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.LuminanceSource;
 import com.google.zxing.PlanarYUVLuminanceSource;
@@ -147,7 +144,6 @@ public class CameraScanActivity extends BaseFragment {
     private boolean qrLoaded = false;
 
     private QRCodeReader qrReader = null;
-    private BarcodeDetector visionQrReader = null;
 
     private boolean needGalleryButton;
 
@@ -254,7 +250,6 @@ public class CameraScanActivity extends BaseFragment {
         if (isQr()) {
             Utilities.globalQueue.postRunnable(() -> {
                 qrReader = new QRCodeReader();
-                visionQrReader = new BarcodeDetector.Builder(ApplicationLoader.applicationContext).setBarcodeFormats(Barcode.QR_CODE).build();
             });
         }
 
@@ -276,9 +271,6 @@ public class CameraScanActivity extends BaseFragment {
         super.onFragmentDestroy();
         destroy(false, null);
         AndroidUtilities.unlockOrientation(getParentActivity());
-        if (visionQrReader != null) {
-            visionQrReader.release();
-        }
     }
 
     @Override
@@ -1215,193 +1207,86 @@ public class CameraScanActivity extends BaseFragment {
         PointF[] cornerPoints;
     }
 
-    private static PointF[] toPointF(Point[] points, int w, int h) {
-        PointF[] out = new PointF[points.length];
-        for (int i = 0; i < points.length; ++i) {
-            out[i] = new PointF(
-                points[i].x / (float) w,
-                points[i].y / (float) h
-            );
-        }
-        return out;
-    }
-
     private QrResult tryReadQr(byte[] data, Size size, int x, int y, int side, Bitmap bitmap) {
         try {
-            String text;
-            RectF bounds = new RectF();
-            PointF[] cornerPoints = null;
-            int width = 1, height = 1;
-            if (visionQrReader != null && visionQrReader.isOperational()) {
-                Frame frame;
-                if (bitmap != null) {
-                    frame = new Frame.Builder().setBitmap(bitmap).build();
-                    width = bitmap.getWidth();
-                    height = bitmap.getHeight();
-                } else {
-                    frame = new Frame.Builder().setImageData(ByteBuffer.wrap(data), size.getWidth(), size.getHeight(), ImageFormat.NV21).build();
-                    width = size.getWidth();
-                    height = size.getWidth();
-                }
-                SparseArray<Barcode> codes = visionQrReader.detect(frame);
-                if (codes != null && codes.size() > 0) {
-                    Barcode code = codes.valueAt(0);
-                    text = code.rawValue;
-                    cornerPoints = toPointF(code.cornerPoints, width, height);
-                    if (code.cornerPoints == null || code.cornerPoints.length == 0) {
-                        bounds = null;
-                    } else {
-                        float minX = Float.MAX_VALUE,
-                              maxX = Float.MIN_VALUE,
-                              minY = Float.MAX_VALUE,
-                              maxY = Float.MIN_VALUE;
-                        for (Point point : code.cornerPoints) {
-                            minX = Math.min(minX, point.x);
-                            maxX = Math.max(maxX, point.x);
-                            minY = Math.min(minY, point.y);
-                            maxY = Math.max(maxY, point.y);
-                        }
-                        bounds.set(minX, minY, maxX, maxY);
-                    }
-                } else if (bitmap != null) {
-                    Bitmap inverted = invert(bitmap);
-                    bitmap.recycle();
-                    frame = new Frame.Builder().setBitmap(inverted).build();
-                    width = inverted.getWidth();
-                    height = inverted.getHeight();
-                    codes = visionQrReader.detect(frame);
-                    if (codes != null && codes.size() > 0) {
-                        Barcode code = codes.valueAt(0);
-                        text = code.rawValue;
-                        cornerPoints = toPointF(code.cornerPoints, width, height);
-                        if (code.cornerPoints == null || code.cornerPoints.length == 0) {
-                            bounds = null;
-                        } else {
-                            float minX = Float.MAX_VALUE,
-                                    maxX = Float.MIN_VALUE,
-                                    minY = Float.MAX_VALUE,
-                                    maxY = Float.MIN_VALUE;
-                            for (Point point : code.cornerPoints) {
-                                minX = Math.min(minX, point.x);
-                                maxX = Math.max(maxX, point.x);
-                                minY = Math.min(minY, point.y);
-                                maxY = Math.max(maxY, point.y);
-                            }
-                            bounds.set(minX, minY, maxX, maxY);
-                        }
-                    } else {
-                        Bitmap monochrome = monochrome(inverted, 90);
-                        inverted.recycle();
-                        frame = new Frame.Builder().setBitmap(monochrome).build();
-                        width = inverted.getWidth();
-                        height = inverted.getHeight();
-                        codes = visionQrReader.detect(frame);
-                        if (codes != null && codes.size() > 0) {
-                            Barcode code = codes.valueAt(0);
-                            text = code.rawValue;
-                            cornerPoints = toPointF(code.cornerPoints, width, height);
-                            if (code.cornerPoints == null || code.cornerPoints.length == 0) {
-                                bounds = null;
-                            } else {
-                                float minX = Float.MAX_VALUE,
-                                        maxX = Float.MIN_VALUE,
-                                        minY = Float.MAX_VALUE,
-                                        maxY = Float.MIN_VALUE;
-                                for (Point point : code.cornerPoints) {
-                                    minX = Math.min(minX, point.x);
-                                    maxX = Math.max(maxX, point.x);
-                                    minY = Math.min(minY, point.y);
-                                    maxY = Math.max(maxY, point.y);
-                                }
-                                bounds.set(minX, minY, maxX, maxY);
-                            }
-                        } else {
-                            text = null;
-                        }
-                    }
-                } else {
-                    text = null;
-                }
-            } else if (qrReader != null) {
-                LuminanceSource source;
-                if (bitmap != null) {
-                    int[] intArray = new int[bitmap.getWidth() * bitmap.getHeight()];
-                    bitmap.getPixels(intArray, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-                    source = new RGBLuminanceSource(bitmap.getWidth(), bitmap.getHeight(), intArray);
-                    width = bitmap.getWidth();
-                    height = bitmap.getHeight();
-                } else {
-                    source = new PlanarYUVLuminanceSource(data, size.getWidth(), size.getHeight(), x, y, side, side, false);
-                    width = size.getWidth();
-                    height = size.getHeight();
-                }
-
-                Result result = qrReader.decode(new BinaryBitmap(new GlobalHistogramBinarizer(source)));
-                if (result == null) {
-                    onNoQrFound();
-                    return null;
-                }
-                text = result.getText();
-                if (result.getResultPoints() == null || result.getResultPoints().length == 0) {
-                    bounds = null;
-                } else {
-                    float minX = Float.MAX_VALUE,
-                          maxX = Float.MIN_VALUE,
-                          minY = Float.MAX_VALUE,
-                          maxY = Float.MIN_VALUE;
-                    for (ResultPoint point : result.getResultPoints()) {
-                        minX = Math.min(minX, point.getX());
-                        maxX = Math.max(maxX, point.getX());
-                        minY = Math.min(minY, point.getY());
-                        maxY = Math.max(maxY, point.getY());
-                    }
-                    bounds.set(minX, minY, maxX, maxY);
-                    if (result.getResultPoints().length == 4) {
-                        cornerPoints = new PointF[4];
-                        for (int i = 0; i < 4; ++i) {
-                            cornerPoints[i] = new PointF(
-                                result.getResultPoints()[i].getX() / width,
-                                result.getResultPoints()[i].getY() / height
-                            );
-                        }
-                    }
-                }
-            } else {
-                text = null;
-            }
-            if (TextUtils.isEmpty(text)) {
+            if (qrReader == null) {
                 onNoQrFound();
                 return null;
             }
-            if (needGalleryButton) {
-                Uri uri = Uri.parse(text);
-                String path = uri.getPath().replace("/", "");
+
+            LuminanceSource source;
+            int width;
+            int height;
+            if (bitmap != null) {
+                width = bitmap.getWidth();
+                height = bitmap.getHeight();
+                int[] pixels = new int[width * height];
+                bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+                source = new RGBLuminanceSource(width, height, pixels);
             } else {
-                if (currentType == TYPE_QR_LOGIN && !text.startsWith("tg://login?token=")) {
-                    onNoQrFound();
-                    return null;
+                width = size.getWidth();
+                height = size.getHeight();
+                source = new PlanarYUVLuminanceSource(data, width, height, x, y, side, side, false);
+            }
+
+            Result result;
+            try {
+                qrReader.reset();
+                result = qrReader.decode(new BinaryBitmap(new GlobalHistogramBinarizer(source)));
+            } finally {
+                qrReader.reset();
+            }
+            if (result == null || TextUtils.isEmpty(result.getText())) {
+                onNoQrFound();
+                return null;
+            }
+
+            String text = result.getText();
+            RectF bounds = null;
+            PointF[] cornerPoints = null;
+            ResultPoint[] resultPoints = result.getResultPoints();
+            if (resultPoints != null && resultPoints.length > 0) {
+                float minX = Float.MAX_VALUE, maxX = Float.MIN_VALUE;
+                float minY = Float.MAX_VALUE, maxY = Float.MIN_VALUE;
+                for (ResultPoint point : resultPoints) {
+                    minX = Math.min(minX, point.getX());
+                    maxX = Math.max(maxX, point.getX());
+                    minY = Math.min(minY, point.getY());
+                    maxY = Math.max(maxY, point.getY());
+                }
+                bounds = new RectF(minX, minY, maxX, maxY);
+                if (resultPoints.length == 4) {
+                    cornerPoints = new PointF[4];
+                    for (int i = 0; i < 4; ++i) {
+                        cornerPoints[i] = new PointF(resultPoints[i].getX() / width, resultPoints[i].getY() / height);
+                    }
                 }
             }
+
+            if (needGalleryButton) {
+                Uri uri = Uri.parse(text);
+                String path = uri.getPath() == null ? "" : uri.getPath().replace("/", "");
+            } else if (currentType == TYPE_QR_LOGIN && !text.startsWith("tg://login?token=")) {
+                onNoQrFound();
+                return null;
+            }
+
             QrResult qrResult = new QrResult();
             if (bounds != null) {
-                int paddingx = dp(25),
-                    paddingy = dp(15);
-                bounds.set(bounds.left - paddingx, bounds.top - paddingy, bounds.right + paddingx, bounds.bottom + paddingy);
-                bounds.set(
-                    bounds.left / (float) width, bounds.top / (float) height,
-                    bounds.right / (float) width, bounds.bottom / (float) height
-                );
+                int paddingX = dp(25), paddingY = dp(15);
+                bounds.set(bounds.left - paddingX, bounds.top - paddingY, bounds.right + paddingX, bounds.bottom + paddingY);
+                bounds.set(bounds.left / (float) width, bounds.top / (float) height,
+                    bounds.right / (float) width, bounds.bottom / (float) height);
             }
             qrResult.cornerPoints = cornerPoints;
             qrResult.bounds = bounds;
             qrResult.text = text;
             return qrResult;
-        } catch (Throwable ignore) {
+        } catch (Throwable error) {
             onNoQrFound();
+            return null;
         }
-        return null;
     }
-
 
     private boolean isQr() {
         return currentType == TYPE_QR || currentType == TYPE_QR_LOGIN || currentType == TYPE_QR_WEB_BOT;
