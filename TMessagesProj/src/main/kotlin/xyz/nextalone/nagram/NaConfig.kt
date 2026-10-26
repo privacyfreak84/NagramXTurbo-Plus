@@ -1057,12 +1057,6 @@ object NaConfig {
             ConfigItem.configTypeBool,
             true
         )
-    val googleTranslateExp =
-        addConfig(
-            "GoogleTranslateExp",
-            ConfigItem.configTypeBool,
-            true
-        )
     val springAnimationCrossfade =
         addConfig(
             "SpringAnimationCrossfade",
@@ -1740,6 +1734,20 @@ object NaConfig {
             return
         }
         freezeSaveDeletedLegacyDefaults()
+
+        // Google Gemini and Vertex presets were removed from this build.
+        // Move any saved selection to the generic OpenAI-compatible custom preset.
+        if (llmProviderPreset.Int() == 2 || llmProviderPreset.Int() == 10) {
+            llmProviderPreset.setConfigInt(0)
+            llmApiUrl.setConfigString("")
+        }
+        val configuredLlmApiUrl = llmApiUrl.String().orEmpty()
+        if (configuredLlmApiUrl.contains("generativelanguage.googleapis.com", ignoreCase = true) ||
+            configuredLlmApiUrl.contains("aiplatform.googleapis.com", ignoreCase = true)
+        ) {
+            llmProviderPreset.setConfigInt(0)
+            llmApiUrl.setConfigString("")
+        }
         if (!notificationIconMigrated.Bool()) {
             if (getPreferences().contains(notificationIcon.key)) {
                 when (notificationIcon.Int()) {
