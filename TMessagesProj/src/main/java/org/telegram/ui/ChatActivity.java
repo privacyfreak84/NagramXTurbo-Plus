@@ -41789,6 +41789,65 @@ public class ChatActivity extends BaseFragment implements
         }
 
         @Override
+        public void didQuickReact(ChatMessageCell cell, MessageObject messageObject, String emoji, float x, float y) {
+            if (getParentActivity() == null || messageObject == null || messageObject.messageOwner == null || TextUtils.isEmpty(emoji)) {
+                return;
+            }
+            if (!isQuickReactionAvailable(messageObject, emoji)) {
+                return;
+            }
+
+            View reactionCell = findMessageCell(messageObject.getId(), true);
+            float reactionX = x;
+            float reactionY = y;
+            if (reactionCell != null && reactionCell != cell) {
+                int[] sourceLocation = new int[2];
+                int[] targetLocation = new int[2];
+                cell.getLocationInWindow(sourceLocation);
+                reactionCell.getLocationInWindow(targetLocation);
+                reactionX += sourceLocation[0] - targetLocation[0];
+                reactionY += sourceLocation[1] - targetLocation[1];
+            }
+            selectReaction(reactionCell != null ? reactionCell : cell, messageObject, null, null, reactionX, reactionY,
+                    ReactionsLayoutInBubble.VisibleReaction.fromEmojicon(emoji), false, false, true, false);
+        }
+
+        private boolean isQuickReactionAvailable(MessageObject messageObject, String emoji) {
+            boolean globallyEnabled = false;
+            for (TLRPC.TL_availableReaction reaction : MediaDataController.getInstance(currentAccount).getEnabledReactionsList()) {
+                if (emoji.equals(reaction.reaction)) {
+                    globallyEnabled = true;
+                    break;
+                }
+            }
+            if (!globallyEnabled) {
+                return false;
+            }
+
+            // When Telegram provides a chat-specific allow-list, honor it before
+            // using the normal selectReaction/sendReaction path.
+            if (messageObject.getDialogId() < 0) {
+                TLRPC.ChatFull chatFull = getMessagesController().getChatFull(-messageObject.getDialogId());
+                if (chatFull != null) {
+                    TLRPC.ChatReactions allowed = chatFull.available_reactions;
+                    if (allowed instanceof TLRPC.TL_chatReactionsNone) {
+                        return false;
+                    }
+                    if (allowed instanceof TLRPC.TL_chatReactionsSome) {
+                        for (TLRPC.Reaction candidate : ((TLRPC.TL_chatReactionsSome) allowed).reactions) {
+                            if (candidate instanceof TLRPC.TL_reactionEmoji && emoji.equals(((TLRPC.TL_reactionEmoji) candidate).emoticon)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                    return allowed instanceof TLRPC.TL_chatReactionsAll;
+                }
+            }
+            return true;
+        }
+
+        @Override
         public void didQuickShareStart(ChatMessageCell cell, float x, float y) {
             if (getParentActivity() == null) {
                 return;

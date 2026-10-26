@@ -152,6 +152,12 @@ object NaConfig {
             ConfigItem.configTypeBool,
             true
         )
+    val quickReactionLikeEnabled =
+        addConfig(
+            "QuickReactionLikeEnabled",
+            ConfigItem.configTypeBool,
+            false
+        )
     val showNoQuoteForward =
         addConfig(
             "NoQuoteForward",

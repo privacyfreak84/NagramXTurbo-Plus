@@ -11540,4 +11540,6 @@
     <string name="CreateManagedBotUsernameBotLimit">This bot already has a Premium username. Remove it before adding another.</string>
     <string name="CreateManagedBotUsernameSuffixMissing">The username must end in %1$s.</string>
     <string name="CreateManagedBotUsernameCheckFailed">Couldn\'t check this username. Please try again.</string>
+    <string name="QuickReactionLikeEnabled">Enable swipe-up Like reaction</string>
+    <string name="QuickReactionLikeEnabledAbout">Swipe up from a message share handle to react with 👍. Hold still to open quick-forward.</string>
 </resources>

@@ -176,6 +176,7 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
     private final AbstractConfigCell dividerDownloading = cellGroup.appendCell(new ConfigCellDivider());
 
     private final AbstractConfigCell headerForwarding = BuildVars.TURBO_BASE ? null : cellGroup.appendCell(new ConfigCellHeader(getString(R.string.ForwardingSettings)));
+    private final AbstractConfigCell quickReactionLikeEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getQuickReactionLikeEnabled(), getString(R.string.QuickReactionLikeEnabledAbout)));
     private final AbstractConfigCell forwardProtectedModeRow = BuildVars.TURBO_BASE ? null : cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getForwardProtectedMode(), new String[]{
             getString(R.string.ForwardProtectedModeAsk),
             getString(R.string.ForwardProtectedModeAlways),
