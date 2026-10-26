@@ -175,7 +175,7 @@ public class UnifiedPushService extends PushService {
     }
 
     private static boolean isUnifiedPushDisabled() {
-        return NaConfig.getPreferences().getInt(NaConfig.INSTANCE.getPushServiceType().getKey(), 1) != 2;
+        return NaConfig.getPreferences().getInt(NaConfig.INSTANCE.getPushServiceType().getKey(), 1) != 1;
     }
 
     private static synchronized void loadWebPushKeys() {

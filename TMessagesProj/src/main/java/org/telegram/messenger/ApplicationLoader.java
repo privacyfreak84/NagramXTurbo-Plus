@@ -460,7 +460,7 @@ public class ApplicationLoader extends Application {
                 getPushProvider().onRequestPushToken();
             } else {
                 if (BuildVars.LOGS_ENABLED) {
-                    FileLog.d("No valid " + getPushProvider().getLogTitle() + " APK found.");
+                    FileLog.d("No compatible " + getPushProvider().getLogTitle() + " distributor installed; remote push is unavailable.");
                 }
                 SharedConfig.pushStringStatus = "__NO_PUSH_DISTRIBUTOR__";
                 PushListenerController.sendRegistrationToServer(getPushProvider().getPushType(), null);

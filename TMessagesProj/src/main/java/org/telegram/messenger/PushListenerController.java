@@ -31,6 +31,8 @@ import xyz.nextalone.nagram.NaConfig;
 
 @Keep
 public class PushListenerController {
+    // Legacy Telegram server registration type. Retained only to clear old FCM tokens;
+    // this build does not include or use a Firebase push provider.
     public static final int PUSH_TYPE_FIREBASE = 2,
         PUSH_TYPE_SIMPLE = 4,
         PUSH_TYPE_WEB = 10,
