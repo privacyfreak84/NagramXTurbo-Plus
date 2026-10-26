@@ -161,28 +161,21 @@ public class GiftPremiumBottomSheet extends BottomSheetWithRecyclerListView impl
         if (userFull != null) {
             List<QueryProductDetailsParams.Product> products = new ArrayList<>();
             long pricePerMonthMax = 0;
-//            for (TLRPC.TL_premiumGiftOption option : userFull.premium_gifts) {
-//                if ("XTR".equalsIgnoreCase(option.currency)) continue;
-//                TLRPC.TL_premiumGiftOption starsOption = null;
-//                for (TLRPC.TL_premiumGiftOption o : userFull.premium_gifts) {
-//                    if (o != option && "XTR".equalsIgnoreCase(o.currency) && o.months == option.months) {
-//                        starsOption = o;
-//                        break;
-//                    }
-//                }
-//                final GiftTier giftTier = new GiftTier(option, starsOption);
-//                giftTiers.add(giftTier);
-//                if (BuildVars.useInvoiceBilling()) {
-//                    if (giftTier.getPricePerMonth() > pricePerMonthMax) {
-//                        pricePerMonthMax = giftTier.getPricePerMonth();
-//                    }
-//                } else if (giftTier.giftOption.store_product != null && BillingController.getInstance().isReady()) {
-//                    products.add(QueryProductDetailsParams.Product.newBuilder()
-//                            .setProductType(BillingClient.ProductType.INAPP)
-//                            .setProductId(giftTier.giftOption.store_product)
-//                            .build());
-//                }
-//            }
+            for (TLRPC.TL_premiumGiftOption option : userFull.premium_gifts) {
+                if ("XTR".equalsIgnoreCase(option.currency)) continue;
+                TLRPC.TL_premiumGiftOption starsOption = null;
+                for (TLRPC.TL_premiumGiftOption candidate : userFull.premium_gifts) {
+                    if (candidate != option && "XTR".equalsIgnoreCase(candidate.currency) && candidate.months == option.months) {
+                        starsOption = candidate;
+                        break;
+                    }
+                }
+                GiftTier tier = new GiftTier(option, starsOption);
+                giftTiers.add(tier);
+                if (BuildVars.useInvoiceBilling() && tier.getPricePerMonth() > pricePerMonthMax) {
+                    pricePerMonthMax = tier.getPricePerMonth();
+                }
+            }
             if (BuildVars.useInvoiceBilling()) {
                 for (GiftTier tier : giftTiers) {
                     tier.setPricePerMonthRegular(pricePerMonthMax);

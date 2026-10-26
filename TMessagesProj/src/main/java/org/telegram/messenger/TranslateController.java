@@ -15,14 +15,6 @@ import android.view.inputmethod.InputMethodSubtype;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-//import com.google.mlkit.common.model.RemoteModelManager;
-//import com.google.mlkit.common.sdkinternal.MlKitContext;
-//import com.google.mlkit.common.sdkinternal.SharedPrefManager;
-//import com.google.mlkit.nl.translate.TranslateLanguage;
-//import com.google.mlkit.nl.translate.TranslateRemoteModel;
-//import com.google.mlkit.nl.translate.Translation;
-//import com.google.mlkit.nl.translate.Translator;
-//import com.google.mlkit.nl.translate.TranslatorOptions;
 
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.InputSerializedData;
@@ -1309,12 +1301,10 @@ public class TranslateController extends BaseController {
 //        checkModelInstalled(fromLanguage, () -> {
 //            checkModelInstalled(toLanguage, () -> {
 //
-//                TranslatorOptions.Builder options = new TranslatorOptions.Builder();
 //                options.setSourceLanguage(fromLanguage);
 //                options.setTargetLanguage(toLanguage);
 //                final Translator translator = Translation.getClient(options.build());
 //
-//                FileLog.d("[mlkit] downloadModelIfNeeded started");
 //                final long start = System.currentTimeMillis();
 //                final int[] triesCount = new int[1];
 //                final Runnable[] tryDownloadModelIfNeeded = new Runnable[1];
@@ -1353,7 +1343,6 @@ public class TranslateController extends BaseController {
 //                                    final long start2 = System.currentTimeMillis();
 //                                    translator.translate(line)
 //                                        .addOnSuccessListener(res -> {
-//                                            FileLog.d("[mlkit] translate success took " + (System.currentTimeMillis() - start2) + "ms");
 //                                            AndroidUtilities.runOnUIThread(() -> {
 //                                                result[index] = res;
 //                                                if (isDone.run() && !sent[0]) {
@@ -1365,8 +1354,6 @@ public class TranslateController extends BaseController {
 //                                            });
 //                                        })
 //                                        .addOnFailureListener(err -> {
-//                                            FileLog.d("[mlkit] translate fail took " + (System.currentTimeMillis() - start2) + "ms");
-//                                            FileLog.e("[mlkit] translate failed", err);
 //                                            if (!sent[0]) {
 //                                                sent[0] = true;
 //                                                done.run(null);
@@ -1376,10 +1363,7 @@ public class TranslateController extends BaseController {
 //                            }
 //                        })
 //                        .addOnFailureListener(err -> {
-//                            FileLog.d("[mlkit] downloadModelIfNeeded fail took " + (System.currentTimeMillis() - start) + "ms");
-//                            FileLog.e("[mlkit] downloadModelIfNeeded failed", err);
 //                            if (triesCount[0] < 3) {
-//                                FileLog.d("[mlkit] downloadModelIfNeeded trying again (try count = "+triesCount[0]+")");
 //                                triesCount[0]++;
 //                                AndroidUtilities.runOnUIThread(tryDownloadModelIfNeeded[0], 250);
 //                                return;
@@ -2468,7 +2452,6 @@ public class TranslateController extends BaseController {
 
 //    private static DispatchQueue checkProgressQueue;
 //    public static Runnable trackDownloadingProgress(String lng, Utilities.Callback<Float> onProgress) {
-//        TranslateRemoteModel model = new TranslateRemoteModel.Builder(lng).build();
 //        boolean[] loading = new boolean[1];
 //        loading[0] = true;
 //        Runnable[] checkProgress = new Runnable[1];
@@ -2491,7 +2474,6 @@ public class TranslateController extends BaseController {
 //                        int downloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
 //                        long size = cursor.getInt(sizeIndex);
 //                        long downloaded = cursor.getInt(downloadedIndex);
-//                        FileLog.d("[mlkit] downloading " + lng + " model: " + ((float) (downloaded) / size * 100f) + "% (" + downloaded + "/" + size + ")");
 //                        if (size != -1) {
 //                            AndroidUtilities.runOnUIThread(() -> {
 //                                onProgress.run((float) downloaded / size);
@@ -2503,7 +2485,6 @@ public class TranslateController extends BaseController {
 //                        checkProgressQueue.postRunnable(checkProgress[0], 120);
 //                    }
 //                } catch (Exception e) {
-//                    FileLog.e("[mlkit] failed to get percent", e);
 //                }
 //            }).run();
 //        });
@@ -2512,18 +2493,15 @@ public class TranslateController extends BaseController {
 //        };
 //    }
 
-//    private static void tryGetModelDownloadId(TranslateRemoteModel model, int tried, Utilities.Callback<Long> onDownloadId) {
 //        if (onDownloadId == null || tried >= 5) {
 //            return;
 //        }
 //        try {
-//            Long downloadId = SharedPrefManager.getInstance(MlKitContext.getInstance()).getDownloadingModelId(model);
 //            if (downloadId != null) {
 //                onDownloadId.run(downloadId);
 //                return;
 //            }
 //        } catch (Exception e) {
-//            FileLog.e("[mlkit] failed to get model download id", e);
 //        }
 //        AndroidUtilities.runOnUIThread(
 //            () -> tryGetModelDownloadId(model, tried + 1, onDownloadId),
@@ -2539,17 +2517,13 @@ public class TranslateController extends BaseController {
 //    private BaseFragment bulletinFragment;
 //
 //    private void checkModelInstalled(String lng, Runnable done) {
-//        RemoteModelManager.getInstance()
-//            .isModelDownloaded(new TranslateRemoteModel.Builder(lng).build())
 //            .addOnSuccessListener(downloaded -> {
-//                FileLog.d("[mlkit] isModelDownloaded " + lng + " = " + downloaded);
 //                if (!downloaded) {
 //                    trackModelDownloading(lng);
 //                }
 //                AndroidUtilities.runOnUIThread(done);
 //            })
 //            .addOnFailureListener(e -> {
-//                FileLog.e("[mlkit] isModelDownloaded " + lng + " failed", e);
 //                AndroidUtilities.runOnUIThread(done);
 //            });
 //    }

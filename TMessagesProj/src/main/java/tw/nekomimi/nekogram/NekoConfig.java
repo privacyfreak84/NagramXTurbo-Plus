@@ -207,7 +207,7 @@ public class NekoConfig {
 
     public static void init() {
         loadConfig(false);
-        // Provider IDs 1 and 2 used to select Google translation. Use Yandex instead.
+        // Legacy provider IDs 1 and 2 now map to Yandex.
         if (translationProvider.Int() == 1 || translationProvider.Int() == 2) {
             translationProvider.setConfigInt(3);
         }

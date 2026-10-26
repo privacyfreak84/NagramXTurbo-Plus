@@ -61,8 +61,6 @@ interface Translator {
 
     companion object {
 
-        const val providerGoogle = 1
-        const val providerGoogleCN = 2 // deprecated
         const val providerYandex = 3
         const val providerLingo = 4
         const val providerMicrosoft = 5
@@ -303,14 +301,14 @@ interface Translator {
                 providerYandex -> if (language == "pt" && countryUpperCase == "BR") {
                     language = "pt-BR"
                 }
-                providerMicrosoft, providerRealMicrosoft, providerGoogle -> {
+                providerMicrosoft, providerRealMicrosoft -> {
                     if (language == "zh") {
                         if (countryUpperCase == "CN") {
                             language =
-                                if (provider == providerMicrosoft || provider == providerRealMicrosoft) "zh-Hans" else "zh-CN"
+                                "zh-Hans"
                         } else if (countryUpperCase == "TW" || countryUpperCase == "HK") {
                             language =
-                                if (provider == providerMicrosoft || provider == providerRealMicrosoft) "zh-Hant" else "zh-TW"
+                                "zh-Hant"
                         }
                     } else if (
                         language == "pt" && countryUpperCase == "PT" &&
@@ -324,7 +322,6 @@ interface Translator {
                     TelegramAPITranslator.convertLanguageCode(language, country)
             }
             val translator = when (provider) {
-                providerGoogle, providerGoogleCN -> YandexTranslator
                 providerYandex -> YandexTranslator
                 providerLingo -> LingoTranslator
                 providerMicrosoft -> MicrosoftTranslator
