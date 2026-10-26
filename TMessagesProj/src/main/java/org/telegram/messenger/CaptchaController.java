@@ -1,10 +1,6 @@
 package org.telegram.messenger;
 
-import android.app.Activity;
-
 import org.telegram.tgnet.ConnectionsManager;
-import org.telegram.ui.LaunchActivity;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,14 +54,10 @@ public class CaptchaController {
         r.requestTokens.add(requestToken);
         final Request finalRequest = r;
 
-        final Activity activity = AndroidUtilities.getActivity();
-        if (true || activity == null) {
-            FileLog.e("CaptchaController: no activity found");
-            finalRequest.done("RECAPTCHA_FAILED_NO_ACTIVITY");
-            return;
-        }
-
-
+        // reCAPTCHA is not bundled in this Google-free build. Fail closed so a
+        // server challenge cannot be silently bypassed.
+        FileLog.e("CaptchaController: reCAPTCHA provider unavailable; failing challenge closed");
+        finalRequest.done("RECAPTCHA_FAILED_NO_ACTIVITY");
     }
 
 
