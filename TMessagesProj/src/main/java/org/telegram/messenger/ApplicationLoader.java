@@ -123,9 +123,6 @@ public class ApplicationLoader extends Application {
         return pushProvider;
     }
 
-    /*protected PushListenerController.IPushListenerServiceProvider onCreatePushProvider() {
-        return PushListenerController.GooglePushListenerServiceProvider.INSTANCE;
-    }*/
 
     public static String getApplicationId() {
         return BuildConfig.APPLICATION_ID;
@@ -282,7 +279,7 @@ public class ApplicationLoader extends Application {
 
         PushListenerController.reconcilePushRegistration();
 
-        // init fcm
+        // initialize the selected push provider
         initPushServices();
         FileLog.d("app initied");
 
@@ -465,7 +462,7 @@ public class ApplicationLoader extends Application {
                 if (BuildVars.LOGS_ENABLED) {
                     FileLog.d("No valid " + getPushProvider().getLogTitle() + " APK found.");
                 }
-                SharedConfig.pushStringStatus = "__NO_GOOGLE_PLAY_SERVICES__";
+                SharedConfig.pushStringStatus = "__NO_PUSH_DISTRIBUTOR__";
                 PushListenerController.sendRegistrationToServer(getPushProvider().getPushType(), null);
                 startPushService();
             }
