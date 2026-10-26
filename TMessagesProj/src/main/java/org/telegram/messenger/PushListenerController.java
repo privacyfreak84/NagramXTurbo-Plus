@@ -1917,10 +1917,13 @@ public class PushListenerController {
 
     private static boolean isPushTypeDisabled(@PushType int pushType) {
         int serviceType = NaConfig.INSTANCE.getPushServiceType().Int();
+        // In this build, service type 1 is UnifiedPush and 0 is in-app only.
+        // FCM/Huawei providers are not bundled; retain their protocol IDs only
+        // for unregistering registrations left by older installs.
         if (pushType == PUSH_TYPE_WEB || pushType == PUSH_TYPE_SIMPLE) {
-            return serviceType != 2;
+            return serviceType != 1;
         }
-        return serviceType != 1 && serviceType != 3;
+        return true;
     }
     // UP end
 }
