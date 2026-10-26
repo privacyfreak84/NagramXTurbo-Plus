@@ -1627,7 +1627,7 @@ public class LPhotoPaintView extends SizeNotifierFrameLayoutPhoto implements IPh
         renderInputView.setVisibility(View.VISIBLE);
     }
 
-    private boolean isSidewardOrientation() {    private boolean isSidewardOrientation() {
+        private boolean isSidewardOrientation() {
         return originalBitmapRotation % 360 == 90 || originalBitmapRotation % 360 == 270;
     }
 

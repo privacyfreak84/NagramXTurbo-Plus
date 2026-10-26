@@ -21,7 +21,7 @@ public class PhotoFace {
     private PointF mouthPoint;
     private PointF chinPoint;
 
-    public boolean isSufficient()    public boolean isSufficient() {
+        public boolean isSufficient() {
         return eyesCenterPoint != null;
     }
 

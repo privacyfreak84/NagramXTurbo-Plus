@@ -2517,7 +2517,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         }
     }
 
-    private boolean isSidewardOrientation() {    private boolean isSidewardOrientation() {
+        private boolean isSidewardOrientation() {
         return originalBitmapRotation % 360 == 90 || originalBitmapRotation % 360 == 270;
     }
 
