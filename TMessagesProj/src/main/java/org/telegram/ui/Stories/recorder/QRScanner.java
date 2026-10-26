@@ -179,7 +179,10 @@ public class QRScanner {
     }
 
     public void detach() {
-
+        QRCodeReader reader = this.reader.getAndSet(null);
+        if (reader != null) {
+            reader.reset();
+        }
     }
 
     public static final class Detected {
