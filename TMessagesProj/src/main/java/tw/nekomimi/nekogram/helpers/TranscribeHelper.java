@@ -59,10 +59,8 @@ public class TranscribeHelper {
     public static final int TRANSCRIBE_AUTO = 0;
     // public static final int TRANSCRIBE_PREMIUM = 1;
     public static final int TRANSCRIBE_WORKERSAI = 2;
-    public static final int TRANSCRIBE_GEMINI = 3;
     public static final int TRANSCRIBE_OPENAI = 4;
-    private static final String GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/" + getString(R.string.LlmModelNameDefault) + ":generateContent?key=%s";
-    private static final String GEMINI_PROMPT = """
+    private static final String DEFAULT_TRANSCRIBE_PROMPT = """
     Your task is to create a detailed, verbatim transcription of the provided audio, formatted like closed captions for the hard of hearing. Follow these instructions strictly:
 
     1.  **Transcribe Speech:** Transcribe all spoken dialogue verbatim. Do NOT include speaker names or labels (like "Speaker 1:", "Person A:", etc.).
@@ -81,11 +79,11 @@ public class TranscribeHelper {
     See! I told you!
     """.trim();
 
-    private static final String OPENAI_COMPATIBLE_DEFAULT_PROMPT = GEMINI_PROMPT;
+    private static final String OPENAI_COMPATIBLE_DEFAULT_PROMPT = DEFAULT_TRANSCRIBE_PROMPT;
 
     public static boolean useTranscribeAI(int account) {
         int provider = NaConfig.INSTANCE.getTranscribeProvider().Int();
-        return provider == TRANSCRIBE_WORKERSAI || provider == TRANSCRIBE_GEMINI || provider == TRANSCRIBE_OPENAI ||
+        return provider == TRANSCRIBE_WORKERSAI || provider == TRANSCRIBE_OPENAI ||
                 (!UserConfig.getInstance(account).isPremium() && provider == TRANSCRIBE_AUTO);
     }
 
@@ -180,69 +178,6 @@ public class TranscribeHelper {
         }
     }
 
-    public static void showGeminiApiKeyDialog(BaseFragment fragment) {
-        var resourcesProvider = fragment.getResourceProvider();
-        var context = fragment.getParentActivity();
-        var builder = new AlertDialog.Builder(context, resourcesProvider);
-        builder.setTitle(getString(R.string.LlmProviderGeminiKey));
-        builder.setMessage(AndroidUtilities.replaceSingleTag(getString(R.string.GeminiApiKeyDialog),
-                -1,
-                AndroidUtilities.REPLACING_TAG_TYPE_LINKBOLD,
-                () -> {
-                    fragment.dismissCurrentDialog();
-                    Browser.openUrl(context, "https://aistudio.google.com/app/apikey");
-                },
-                resourcesProvider));
-        builder.setCustomViewOffset(0);
-
-        var ll = new LinearLayout(context);
-        ll.setOrientation(LinearLayout.VERTICAL);
-
-        var editTextApiKey = createAndSetupEditText(
-                context,
-                resourcesProvider,
-                NaConfig.INSTANCE.getTranscribeProviderGeminiApiKey().String(),
-                getString(R.string.LlmApiKey),
-                EditorInfo.IME_ACTION_DONE,
-                true
-        );
-        ll.addView(editTextApiKey, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 24, 0, 24, 0));
-
-        var editTextPrompt = createAndSetupEditText(
-                context,
-                resourcesProvider,
-                NaConfig.INSTANCE.getTranscribeProviderGeminiPrompt().String(),
-                getString(R.string.TranscribeProviderGeminiPrompt),
-                EditorInfo.IME_ACTION_DONE,
-                false
-        );
-        ll.addView(editTextPrompt, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 24, 0, 24, 0));
-
-        builder.setView(ll);
-        builder.setNegativeButton(getString(R.string.Cancel), null);
-        builder.setPositiveButton(getString(R.string.OK), null);
-        var dialog = builder.create();
-        fragment.showDialog(dialog);
-        var button = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-        if (button != null) {
-            button.setOnClickListener(v -> {
-                var apiKey = editTextApiKey.getText();
-                if (!TextUtils.isEmpty(apiKey) && apiKey.length() < 39) {
-                    AndroidUtilities.shakeViewSpring(editTextApiKey, -6);
-                    BotWebViewVibrationEffect.APP_ERROR.vibrate();
-                    return;
-                }
-                NaConfig.INSTANCE.getTranscribeProviderGeminiApiKey().setConfigString(apiKey == null ? "" : apiKey.toString());
-                if (NaConfig.INSTANCE.getLlmProviderGeminiKey().String().isEmpty()) {
-                    NaConfig.INSTANCE.getLlmProviderGeminiKey().setConfigString(apiKey == null ? "" : apiKey.toString());
-                }
-                var prompt = editTextPrompt.getText();
-                NaConfig.INSTANCE.getTranscribeProviderGeminiPrompt().setConfigString(prompt == null ? "" : prompt.toString());
-                dialog.dismiss();
-            });
-        }
-    }
-
     public static void showOpenAiCredentialsDialog(BaseFragment fragment) {
         if (fragment == null || fragment.getParentActivity() == null) return;
         var resourcesProvider = fragment.getResourceProvider();
@@ -254,7 +189,7 @@ public class TranscribeHelper {
                 AndroidUtilities.REPLACING_TAG_TYPE_LINKBOLD,
                 () -> {
                     fragment.dismissCurrentDialog();
-                    Browser.openUrl(context, "https://ai.google.dev/gemini-api/docs/openai#audio-understanding");
+                    Browser.openUrl(context, "https://platform.openai.com/docs/guides/speech-to-text");
                 },
                 resourcesProvider));
         builder.setCustomViewOffset(0);
@@ -296,7 +231,7 @@ public class TranscribeHelper {
                 context,
                 resourcesProvider,
                 NaConfig.INSTANCE.getTranscribeProviderOpenAiPrompt().String(),
-                getString(R.string.TranscribeProviderGeminiPrompt),
+                getString(R.string.LlmUserPromptHint),
                 EditorInfo.IME_ACTION_DONE,
                 false
         );
@@ -380,22 +315,14 @@ public class TranscribeHelper {
     public static void sendRequest(String path, boolean video, BiConsumer<String, Exception> callback) {
         switch (NaConfig.INSTANCE.getTranscribeProvider().Int()) {
             case TRANSCRIBE_AUTO:
-                if (!TextUtils.isEmpty(NaConfig.INSTANCE.getTranscribeProviderGeminiApiKey().String()) ||
-                        !TextUtils.isEmpty(NaConfig.INSTANCE.getLlmProviderGeminiKey().String())
-                ) {
-                    requestGeminiAi(path, video, callback);
-                } else if (!TextUtils.isEmpty(NaConfig.INSTANCE.getTranscribeProviderOpenAiApiBase().String()) &&
+                if (!TextUtils.isEmpty(NaConfig.INSTANCE.getTranscribeProviderOpenAiApiBase().String()) &&
                         !TextUtils.isEmpty(NaConfig.INSTANCE.getTranscribeProviderOpenAiModel().String()) &&
                         !TextUtils.isEmpty(NaConfig.INSTANCE.getTranscribeProviderOpenAiApiKey().String())
                 ) {
                     requestOpenAiCompatible(path, video, callback);
-                }
-                else {
+                } else {
                     requestWorkersAi(path, video, callback);
                 }
-                break;
-            case TRANSCRIBE_GEMINI:
-                requestGeminiAi(path, video, callback);
                 break;
             case TRANSCRIBE_OPENAI:
                 requestOpenAiCompatible(path, video, callback);
@@ -450,91 +377,6 @@ public class TranscribeHelper {
                     callback.accept(null, new Exception(errors.size() == 1 ? errors.get(0).message : errors.toString()));
                 }
             } catch (Exception e) {
-                callback.accept(null, e);
-            }
-        });
-    }
-
-    private static void requestGeminiAi(String path, boolean video, BiConsumer<String, Exception> callback) {
-        String apiKey = NaConfig.INSTANCE.getTranscribeProviderGeminiApiKey().String();
-        if (TextUtils.isEmpty(apiKey)) {
-            apiKey = NaConfig.INSTANCE.getLlmProviderGeminiKey().String().split(",")[0].trim();
-        }
-        if (TextUtils.isEmpty(apiKey)) {
-            callback.accept(null, new Exception(getString(R.string.GeminiApiKeyNotSet)));
-            return;
-        }
-        String customPrompt = NaConfig.INSTANCE.getTranscribeProviderGeminiPrompt().String();
-        final String finalApiKey = apiKey;
-        final String finalPrompt = customPrompt.isEmpty() ? GEMINI_PROMPT : customPrompt;
-        executorService.submit(() -> {
-            String audioPath;
-            try {
-                if (video) {
-                    var audioFile = new File(path + ".m4a");
-                    try {
-                        extractAudio(path, audioFile.getAbsolutePath());
-                    } catch (IOException e) {
-                        FileLog.e(e);
-                    }
-                    audioPath = audioFile.exists() ? audioFile.getAbsolutePath() : path;
-                } else {
-                    audioPath = path;
-                }
-                File audioFile = new File(audioPath);
-                if (!audioFile.exists()) {
-                    throw new IOException("Audio file not found: " + audioPath);
-                }
-                byte[] audioBytes = Files.readAllBytes(audioFile.toPath());
-                String base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP);
-                GeminiRequest.InlineData inlineData = new GeminiRequest.InlineData(video ? "audio/m4a" : "audio/ogg", base64Audio);
-                GeminiRequest.Part audioPart = new GeminiRequest.Part(null, inlineData);
-                GeminiRequest.Part textPart = new GeminiRequest.Part(finalPrompt, null);
-                GeminiRequest.Content content = new GeminiRequest.Content(List.of(textPart, audioPart));
-                GeminiRequest geminiRequest = new GeminiRequest(List.of(content));
-                String jsonRequest = gson.toJson(geminiRequest);
-
-                OkHttpClient client = getOkHttpClient();
-                RequestBody requestBody = RequestBody.create(jsonRequest, HttpClient.MEDIA_TYPE_JSON);
-                Request request = new Request.Builder()
-                        .url(String.format(GEMINI_API_ENDPOINT, finalApiKey))
-                        .post(requestBody)
-                        .build();
-                try (Response response = client.newCall(request).execute()) {
-                    String responseBody = response.body().string();
-                    if (!response.isSuccessful()) {
-                        throw new IOException("Gemini API request failed: " + response.code() + " " + response.message() + "\nBody: " + responseBody);
-                    }
-                    GeminiResponse geminiResponse = gson.fromJson(responseBody, GeminiResponse.class);
-                    if (geminiResponse != null && geminiResponse.candidates != null && !geminiResponse.candidates.isEmpty()) {
-                        GeminiResponse.Candidate firstCandidate = geminiResponse.candidates.get(0);
-                        if (firstCandidate.content != null && firstCandidate.content.parts != null && !firstCandidate.content.parts.isEmpty()) {
-                            String transcribedText = firstCandidate.content.parts.stream()
-                                    .filter(part -> !TextUtils.isEmpty(part.text))
-                                    .map(part -> part.text)
-                                    .findFirst()
-                                    .orElse(null);
-                            if (transcribedText != null) {
-                                callback.accept(transcribedText.trim(), null);
-                            } else {
-                                String finishReason = firstCandidate.finishReason;
-                                List<GeminiResponse.SafetyRating> safetyRatings = firstCandidate.safetyRatings;
-                                String errorMsg = "Gemini response did not contain text.";
-                                if (finishReason != null) errorMsg += " Finish reason: " + finishReason;
-                                if (safetyRatings != null) errorMsg += " Safety Ratings: " + safetyRatings;
-                                callback.accept(null, new Exception(errorMsg));
-                            }
-                        } else {
-                            callback.accept(null, new Exception("Gemini response structure invalid (no content parts). Finish Reason: " + firstCandidate.finishReason));
-                        }
-                    } else if (geminiResponse != null && geminiResponse.promptFeedback != null) {
-                        callback.accept(null, new Exception("Gemini prompt feedback: " + geminiResponse.promptFeedback));
-                    } else {
-                        callback.accept(null, new Exception("Invalid or empty response from Gemini API: " + responseBody));
-                    }
-                }
-            } catch (Exception e) {
-                FileLog.e("Gemini transcription error", e);
                 callback.accept(null, e);
             }
         });
@@ -668,116 +510,6 @@ public class TranscribeHelper {
         @Override
         public String toString() {
             return message != null ? message : "Unknown error";
-        }
-    }
-
-    private static class GeminiRequest {
-        @SerializedName("contents")
-        @Expose
-        public List<Content> contents;
-
-        public GeminiRequest(List<Content> contents) {
-            this.contents = contents;
-        }
-
-        public static class Content {
-            @SerializedName("parts")
-            @Expose
-            public List<Part> parts;
-
-            public Content() {}
-            public Content(List<Part> parts) {
-                this.parts = parts;
-            }
-        }
-
-        public static class Part {
-            @SerializedName("text")
-            @Expose
-            public String text;
-
-            @SerializedName("inlineData")
-            @Expose
-            public InlineData inlineData;
-
-            public Part(String text, InlineData inlineData) {
-                this.text = text;
-                this.inlineData = inlineData;
-            }
-        }
-
-        public static class InlineData {
-            @SerializedName("mimeType")
-            @Expose
-            public String mimeType;
-
-            @SerializedName("data")
-            @Expose
-            public String data;
-
-            public InlineData(String mimeType, String data) {
-                this.mimeType = mimeType;
-                this.data = data;
-            }
-        }
-    }
-
-    private static class GeminiResponse {
-        @SerializedName("candidates")
-        @Expose
-        public List<Candidate> candidates;
-
-        @SerializedName("promptFeedback")
-        @Expose
-        public PromptFeedback promptFeedback;
-
-        public static class Candidate {
-            @SerializedName("content")
-            @Expose
-            public GeminiRequest.Content content;
-
-            @SerializedName("finishReason")
-            @Expose
-            public String finishReason;
-
-            @SerializedName("index")
-            @Expose
-            public Integer index;
-
-            @SerializedName("safetyRatings")
-            @Expose
-            public List<SafetyRating> safetyRatings;
-        }
-
-        public static class SafetyRating {
-            @SerializedName("category")
-            @Expose
-            public String category;
-            @SerializedName("probability")
-            @Expose
-            public String probability;
-
-            @NonNull
-            @Override
-            public String toString() {
-                return category + ": " + probability;
-            }
-        }
-
-        public static class PromptFeedback {
-            @SerializedName("blockReason")
-            @Expose
-            public String blockReason;
-
-            @SerializedName("safetyRatings")
-            @Expose
-            public List<SafetyRating> safetyRatings;
-
-            @NonNull
-            @Override
-            public String toString() {
-                return "BlockReason: " + blockReason + ", Ratings: " + safetyRatings;
-            }
         }
     }
 
