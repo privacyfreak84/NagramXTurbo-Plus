@@ -271,7 +271,7 @@ interface Translator {
 
         private fun getBulkTranslateProvider(provider: Int): Int {
             return when (provider) {
-                providerDeepL -> providerGoogle
+                providerDeepL -> providerYandex
                 else -> provider
             }
         }
@@ -324,7 +324,7 @@ interface Translator {
                     TelegramAPITranslator.convertLanguageCode(language, country)
             }
             val translator = when (provider) {
-                providerGoogle -> GoogleAppTranslator
+                providerGoogle, providerGoogleCN -> YandexTranslator
                 providerYandex -> YandexTranslator
                 providerLingo -> LingoTranslator
                 providerMicrosoft -> MicrosoftTranslator
@@ -348,7 +348,6 @@ interface Translator {
         data class ProviderInfo(val providerConstant: Int, val nameResId: Int) {
             companion object {
                 val PROVIDERS = arrayOf(
-                    ProviderInfo(providerGoogle, R.string.ProviderGoogleTranslate),
                     ProviderInfo(providerYandex, R.string.ProviderYandexTranslate),
                     ProviderInfo(providerLingo, R.string.ProviderLingocloud),
                     ProviderInfo(providerMicrosoft, R.string.ProviderMicrosoftTranslator),
