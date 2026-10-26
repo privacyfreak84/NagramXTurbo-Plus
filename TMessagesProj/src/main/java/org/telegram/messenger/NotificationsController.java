@@ -5229,10 +5229,10 @@ public class NotificationsController extends BaseController implements Notificat
                 personCache.put(-chat.id, personBuilder.build());
             }
 
-            NotificationCompat.Action wearReplyAction = null;
+            NotificationCompat.Action replyAction = null;
 
             if ((!isChannel || isSupergroup) && canReply && !SharedConfig.isWaitingForPasscodeEnter && selfUserId != dialogId && !UserObject.isReplyUser(dialogId) && MessagesController.getInstance(currentAccount).getSendPaidMessagesStars(dialogId) <= 0) {
-                Intent replyIntent = new Intent(ApplicationLoader.applicationContext, WearReplyReceiver.class);
+                Intent replyIntent = new Intent(ApplicationLoader.applicationContext, NotificationReplyReceiver.class);
                 replyIntent.putExtra("dialog_id", dialogId);
                 replyIntent.putExtra("max_id", maxId);
                 replyIntent.putExtra("topic_id", topicId);
@@ -5252,17 +5252,17 @@ public class NotificationsController extends BaseController implements Notificat
                     }
                 }
                 PendingIntent replyPendingIntent = PendingIntent.getBroadcast(ApplicationLoader.applicationContext, internalId, replyIntent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-                RemoteInput remoteInputWear = new RemoteInput.Builder(EXTRA_VOICE_REPLY).setLabel(LocaleController.getString(R.string.Reply)).build();
+                RemoteInput remoteInput = new RemoteInput.Builder(EXTRA_VOICE_REPLY).setLabel(LocaleController.getString(R.string.Reply)).build();
                 String replyToString;
                 if (DialogObject.isChatDialog(dialogId)) {
                     replyToString = LocaleController.formatString(R.string.ReplyToGroup, name);
                 } else {
                     replyToString = LocaleController.formatString(R.string.ReplyToUser, name);
                 }
-                wearReplyAction = new NotificationCompat.Action.Builder(R.drawable.ic_reply_icon, replyToString, replyPendingIntent)
+                replyAction = new NotificationCompat.Action.Builder(R.drawable.ic_reply_icon, replyToString, replyPendingIntent)
                         .setAllowGeneratedReplies(true)
                         .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
-                        .addRemoteInput(remoteInputWear)
+                        .addRemoteInput(remoteInput)
                         .setShowsUserInterface(false)
                         .build();
             }
@@ -5640,10 +5640,6 @@ public class NotificationsController extends BaseController implements Notificat
             intent.putExtra("currentAccount", currentAccount);
             PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT);
 
-            NotificationCompat.WearableExtender wearableExtender = new NotificationCompat.WearableExtender();
-            if (wearReplyAction != null) {
-                wearableExtender.addAction(wearReplyAction);
-            }
             Intent msgHeardIntent = new Intent(ApplicationLoader.applicationContext, AutoMessageHeardReceiver.class);
             msgHeardIntent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
             msgHeardIntent.setAction("org.telegram.messenger.ACTION_MESSAGE_HEARD");
@@ -5656,26 +5652,6 @@ public class NotificationsController extends BaseController implements Notificat
                     .setShowsUserInterface(false)
                     .build();
 
-            String dismissalID;
-            if (!DialogObject.isEncryptedDialog(dialogId)) {
-                if (DialogObject.isUserDialog(dialogId)) {
-                    dismissalID = "tguser" + dialogId + "_" + maxId;
-                } else {
-                    dismissalID = "tgchat" + (-dialogId) + "_" + maxId;
-                }
-            } else if (dialogId != globalSecretChatId) {
-                dismissalID = "tgenc" + DialogObject.getEncryptedChatId(dialogId) + "_" + maxId;
-            } else {
-                dismissalID = null;
-            }
-
-            if (dismissalID != null) {
-                wearableExtender.setDismissalId(dismissalID);
-                NotificationCompat.WearableExtender summaryExtender = new NotificationCompat.WearableExtender();
-                summaryExtender.setDismissalId("summary_" + dismissalID);
-                notificationBuilder.extend(summaryExtender);
-            }
-            wearableExtender.setBridgeTag("tgaccount" + selfUserId);
 
             long date;
             if (dialogKey.story) {
@@ -5699,7 +5675,6 @@ public class NotificationsController extends BaseController implements Notificat
                     .setShowWhen(true)
                     .setStyle(messagingStyle)
                     .setContentIntent(contentIntent)
-                    .extend(wearableExtender)
                     .setSortKey(String.valueOf(Long.MAX_VALUE - date))
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE);
 
@@ -5752,8 +5727,8 @@ public class NotificationsController extends BaseController implements Notificat
                 builder.addAction(copyAction);
             }
             if (dialogKey.dialogId != UserObject.VERIFY && dialogKey.dialogId != UserObject.OAUTH) {
-                if (wearReplyAction != null) {
-                    builder.addAction(wearReplyAction);
+                if (replyAction != null) {
+                    builder.addAction(replyAction);
                 }
                 if (!waitingForPasscode && !dialogKey.story && (lastMessageObject == null || !lastMessageObject.isStoryReactionPush)) {
                     builder.addAction(readAction);

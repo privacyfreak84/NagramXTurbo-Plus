@@ -942,6 +942,7 @@
         <receiver android:name=".StopLiveLocationReceiver" android:enabled="true" android:exported="false"/>
 
         <receiver android:name=".PopupReplyReceiver" android:enabled="true" android:exported="false"/>
+        <receiver android:name=".NotificationReplyReceiver" android:enabled="true" android:exported="false"/>
 
         <receiver android:name=".NotificationCallbackReceiver" android:enabled="true" android:exported="false"/>
 
