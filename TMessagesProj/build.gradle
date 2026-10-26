@@ -79,14 +79,8 @@ dependencies {
     implementation 'androidx.interpolator:interpolator:1.0.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'androidx.webkit:webkit:1.14.0'
-
-    implementation 'com.google.android.gms:play-services-cast-framework:21.4.0'
-    implementation "androidx.mediarouter:mediarouter:1.7.0"
     implementation 'com.google.zxing:core:3.5.4'
     implementation 'com.neovisionaries:nv-websocket-client:2.14'
-
-    implementation 'androidx.car.app:app:1.4.0'
-    implementation 'androidx.car.app:app-projected:1.4.0'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
 
 }
@@ -310,20 +304,14 @@ dependencies {
     implementation 'androidx.palette:palette-ktx:1.0.0'
     implementation 'androidx.exifinterface:exifinterface:1.4.2'
     implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
-    implementation 'androidx.mediarouter:mediarouter:1.8.1'
     implementation 'com.google.zxing:core:3.5.4'
     implementation 'androidx.sharetarget:sharetarget:1.2.0'
     implementation 'androidx.interpolator:interpolator:1.0.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'androidx.webkit:webkit:1.14.0'
-    implementation 'androidx.car.app:app:1.7.0'
-    implementation 'androidx.car.app:app-projected:1.7.0'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
     compileOnly 'org.checkerframework:checker-qual:2.5.2'
     compileOnly 'org.checkerframework:checker-compat-qual:2.5.0'
-    implementation 'com.google.android.gms:play-services-cast-framework:22.3.1'
-    implementation 'com.google.android.gms:play-services-auth:21.6.0'
-    implementation 'com.google.android.gms:play-services-wearable:20.0.1'
     implementation 'com.googlecode.mp4parser:isoparser:1.0.6'
     implementation 'com.google.code.gson:gson:2.14.0'
     implementation ('com.google.guava:guava:33.6.0-android') {
@@ -335,7 +323,6 @@ dependencies {
         exclude group: 'org.codehaus.mojo', module: 'animal-sniffer-annotations'
     }
     implementation "androidx.credentials:credentials:1.6.0"
-    implementation "androidx.credentials:credentials-play-services-auth:1.6.0"
     implementation "io.noties.markwon:core:4.6.2"
     implementation "io.noties.markwon:ext-strikethrough:4.6.2"
     implementation "io.noties.markwon:ext-tables:4.6.2"

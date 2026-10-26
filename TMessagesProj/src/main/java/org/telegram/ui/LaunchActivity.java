@@ -91,7 +91,6 @@ import androidx.core.graphics.ColorUtils;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 
-import com.google.android.gms.common.api.Status;
 import com.google.common.primitives.Longs;
 // import com.google.firebase.appindexing.Action;
 // import com.google.firebase.appindexing.FirebaseUserActions;
@@ -7728,13 +7727,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 if (rightActionBarLayout != null) {
                     rightActionBarLayout.animateThemedValues(theme, accentId, nightTheme, instant);
                 }
-            }
-        } else if (id == NotificationCenter.needShowPlayServicesAlert) {
-            try {
-                final Status status = (Status) args[0];
-                status.startResolutionForResult(this, PLAY_SERVICES_REQUEST_CHECK_SETTINGS);
-            } catch (Throwable ignore) {
-
             }
         } else if (id == NotificationCenter.fileLoaded) {
             String path = (String) args[0];
