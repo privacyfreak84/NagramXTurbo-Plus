@@ -811,18 +811,6 @@ object NaConfig {
             ConfigItem.configTypeString,
             ""
         )
-    val llmProviderGeminiKey =
-        addConfig(
-            "LlmProviderGeminiKey",
-            ConfigItem.configTypeString,
-            ""
-        )
-    val llmProviderGeminiModel =
-        addConfig(
-            "LlmProviderGeminiModel",
-            ConfigItem.configTypeString,
-            ""
-        )
     val llmProviderXAIKey =
         addConfig(
             "LlmProviderXAIKey",
@@ -907,18 +895,6 @@ object NaConfig {
             ConfigItem.configTypeString,
             ""
         )
-    val llmProviderVertexKey =
-        addConfig(
-            "LlmProviderVertexKey",
-            ConfigItem.configTypeString,
-            ""
-        )
-    val llmProviderVertexModel =
-        addConfig(
-            "LlmProviderVertexModel",
-            ConfigItem.configTypeString,
-            ""
-        )
     val llmTemperature =
         addConfig(
             "LlmTemperature",
@@ -960,12 +936,6 @@ object NaConfig {
             "ArticleTranslationProvider",
             ConfigItem.configTypeInt,
             1
-        )
-    val disableCrashlyticsCollection =
-        addConfig(
-            "DisableCrashlyticsCollection",
-            ConfigItem.configTypeBool,
-            false
         )
     val showStickersRowToplevel =
         addConfig(
@@ -1249,12 +1219,6 @@ object NaConfig {
             ConfigItem.configTypeString,
             ""
         )
-    val transcribeProviderGeminiApiKey =
-        addConfig(
-            "TranscribeProviderGeminiApiKey",
-            ConfigItem.configTypeString,
-            ""
-        )
     val transcribeProviderOpenAiApiBase =
         addConfig(
             "TranscribeProviderOpenAiApiBase",
@@ -1284,12 +1248,6 @@ object NaConfig {
             "ReplyInPrivate",
             ConfigItem.configTypeBool,
             false
-        )
-    val transcribeProviderGeminiPrompt =
-        addConfig(
-            "TranscribeProviderGeminiPrompt",
-            ConfigItem.configTypeString,
-            ""
         )
     val hideDividers =
         addConfig(
@@ -1747,6 +1705,10 @@ object NaConfig {
         ) {
             llmProviderPreset.setConfigInt(0)
             llmApiUrl.setConfigString("")
+        }
+        // Provider 3 used to mean Gemini transcription. Re-route it to local/Workers AI.
+        if (transcribeProvider.Int() == 3) {
+            transcribeProvider.setConfigInt(2)
         }
         if (!notificationIconMigrated.Bool()) {
             if (getPreferences().contains(notificationIcon.key)) {
