@@ -6,7 +6,6 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -32,7 +31,7 @@ public final class OpenAICompatClient {
                 response,
                 body -> {
                     List<String> models = parseModelIds(body);
-                    return isGeminiModelsEndpoint(credentials.baseUrl()) ? ModelUtil.stripModelsPrefix(models) : models;
+                    return models;
                 },
                 List::isEmpty,
                 "No models found: "
@@ -157,7 +156,5 @@ public final class OpenAICompatClient {
         }
     }
 
-    private static boolean isGeminiModelsEndpoint(String baseUrl) {
-        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("generativelanguage.googleapis.com");
-    }
+}
 }
