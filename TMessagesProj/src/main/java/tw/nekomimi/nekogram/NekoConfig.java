@@ -132,10 +132,9 @@ public class NekoConfig {
     public static ConfigItem cachePath = addConfig("cache_path", configTypeString, "");
     public static ConfigItem customSavePath = addConfig("customSavePath", configTypeString, "Nagram");
 
-    public static ConfigItem translationProvider = addConfig("translationProvider", configTypeInt, 1);
+    public static ConfigItem translationProvider = addConfig("translationProvider", configTypeInt, 3);
     public static ConfigItem translateToLang = addConfig("TransToLang", configTypeString, ""); // "" -> translate to current language (MessageTrans.kt & Translator.kt)
     public static ConfigItem translateInputLang = addConfig("TransInputToLang", configTypeString, "en");
-    public static ConfigItem googleCloudTranslateKey = addConfig("GoogleCloudTransKey", configTypeString, "");
 
     public static ConfigItem disableNotificationBubbles = addConfig("disableNotificationBubbles", configTypeBool, false);
 
