@@ -386,7 +386,7 @@ private suspend fun ChatActivity.translateRichMessageContent(
             texts.map { text ->
                 async(dispatcher) {
                     if (!isActive) return@async
-                    val translated = Translator.translate(target, text, Translator.providerGoogle) // Google Translate is forced here due to rate limits
+                    val translated = Translator.translate(target, text, Translator.providerYandex)
                     RichMessageTransHelper.putCachedTranslation(richMessage, targetLanguage, text, translated)
                 }
             }.awaitAll()

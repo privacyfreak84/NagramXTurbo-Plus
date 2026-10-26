@@ -150,7 +150,6 @@ object AlertUtil {
             val view = reference.get().getButton(AlertDialog.BUTTON_NEUTRAL)
             val popup = PopupBuilder(view, true)
             val providers = listOf(
-                ProviderInfo(Translator.providerGoogle, R.string.ProviderGoogleTranslate),
                 ProviderInfo(Translator.providerYandex, R.string.ProviderYandexTranslate), 
                 ProviderInfo(Translator.providerLingo, R.string.ProviderLingocloud),
                 ProviderInfo(Translator.providerMicrosoft, R.string.ProviderMicrosoftTranslator),
