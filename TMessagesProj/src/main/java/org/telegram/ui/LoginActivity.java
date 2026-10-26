@@ -1739,7 +1739,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private void fillNextCodeParams(Bundle params, TLRPC.auth_SentCode res) {
         fillNextCodeParams(params, res, true);
     }
-*/
 
     public static String errorString(Throwable e) {
         if (e == null) return "NULL";
