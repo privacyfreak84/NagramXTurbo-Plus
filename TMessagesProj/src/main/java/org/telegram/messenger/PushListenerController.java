@@ -1816,22 +1816,11 @@ public class PushListenerController {
     }
 
     public static IPushListenerServiceProvider getProvider() {
-        if (instance != null)
-            return instance;
-        switch (NaConfig.INSTANCE.getPushServiceType().Int()) {
-            case 1:
-            case 3: {
-                instance = new GooglePushListenerServiceProvider();
-                break;
-            }
-            case 2: {
-                instance = new UnifiedPushListenerServiceProvider();
-                break;
-            }
-            default: {
-                instance = new DummyPushProvider();
-                break;
-            }
+        if (instance != null) return instance;
+        if (NaConfig.INSTANCE.getPushServiceType().Int() == 0) {
+            instance = new DummyPushProvider();
+        } else {
+            instance = new UnifiedPushListenerServiceProvider();
         }
         return instance;
     }
@@ -1862,18 +1851,14 @@ public class PushListenerController {
     public static void reconcilePushRegistration() {
         Utilities.stageQueue.postRunnable(() -> {
             int serviceType = NaConfig.INSTANCE.getPushServiceType().Int();
-            boolean googlePush = serviceType == 1 || serviceType == 3;
-            boolean unifiedPushAvailable = serviceType == 2 && UnifiedPush.getAckDistributor(ApplicationLoader.applicationContext) != null;
-            int expectedPushType = serviceType == 2 ? PUSH_TYPE_WEB : PUSH_TYPE_FIREBASE;
-            if ((!googlePush && !unifiedPushAvailable) || SharedConfig.pushType != expectedPushType) {
+            boolean unifiedPushAvailable = serviceType == 1
+                    && UnifiedPush.getAckDistributor(ApplicationLoader.applicationContext) != null;
+            int expectedPushType = serviceType == 1 ? PUSH_TYPE_WEB : PUSH_TYPE_FIREBASE;
+            if (!unifiedPushAvailable || SharedConfig.pushType != expectedPushType) {
                 unregisterCurrentPushInternal();
             }
-            if (!unifiedPushAvailable) {
-                unregisterSimplePush();
-            }
-            if (serviceType != 2) {
-                UnifiedPush.unregister(ApplicationLoader.applicationContext, "default");
-            }
+            if (!unifiedPushAvailable) unregisterSimplePush();
+            if (serviceType != 1) UnifiedPush.unregister(ApplicationLoader.applicationContext, "default");
         });
     }
 

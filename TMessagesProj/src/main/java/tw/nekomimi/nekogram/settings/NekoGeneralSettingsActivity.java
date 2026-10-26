@@ -138,8 +138,6 @@ public class NekoGeneralSettingsActivity extends BaseNekoXSettingsActivity {
 
     // Map
     private final AbstractConfigCell headerMap = cellGroup.appendCell(new ConfigCellHeader(getString(R.string.Map)));
-    private final AbstractConfigCell useOSMDroidMapRow = cellGroup.appendCell(new ConfigCellTextCheck(NekoConfig.useOSMDroidMap));
-    private final AbstractConfigCell mapDriftingFixForGoogleMapsRow = cellGroup.appendCell(new ConfigCellTextCheck(NekoConfig.mapDriftingFixForGoogleMaps));
     private final AbstractConfigCell mapPreviewRow = cellGroup.appendCell(new ConfigCellSelectBox(null, NekoConfig.mapPreviewProvider, new String[]{
             getString(R.string.MapPreviewProviderTelegram),
             getString(R.string.MapPreviewProviderYandexNax),
@@ -236,16 +234,13 @@ public class NekoGeneralSettingsActivity extends BaseNekoXSettingsActivity {
     private final AbstractConfigCell headerPrivacy = cellGroup.appendCell(new ConfigCellHeader(getString(R.string.PrivacyTitle)));
     private final AbstractConfigCell hidePhoneRow = cellGroup.appendCell(new ConfigCellTextCheck(NekoConfig.hidePhone));
     private final AbstractConfigCell disableSystemAccountRow = cellGroup.appendCell(new ConfigCellTextCheck(NekoConfig.disableSystemAccount));
-    private final AbstractConfigCell disableCrashlyticsCollectionRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getDisableCrashlyticsCollection()));
     private final AbstractConfigCell dividerPrivacy = cellGroup.appendCell(new ConfigCellDivider());
 
     // Notifications
     private final AbstractConfigCell headerNotifications = cellGroup.appendCell(new ConfigCellHeader(getString(R.string.Notifications)));
     private final AbstractConfigCell pushServiceTypeRow = cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getPushServiceType(), new String[]{
             getString(R.string.PushServiceTypeInApp),
-            getString(R.string.PushServiceTypeFCM),
             getString(R.string.PushServiceTypeUnified),
-            getString(R.string.PushServiceTypeMicroG),
     }, null));
     private final AbstractConfigCell pushServiceTypeUnifiedGatewayRow = cellGroup.appendCell(new ConfigCellTextInput(null, NaConfig.INSTANCE.getPushServiceTypeUnifiedGateway(), UnifiedPushService.UP_GATEWAY_DEFAULT, null, (input) -> input.isEmpty() ? (String) NaConfig.INSTANCE.getPushServiceTypeUnifiedGateway().defaultValue : input));
     private final AbstractConfigCell pushServiceTypeInAppDialogRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getPushServiceTypeInAppDialog()));
@@ -270,7 +265,6 @@ public class NekoGeneralSettingsActivity extends BaseNekoXSettingsActivity {
         wasCenteredAtBeginning = wasCentered;
 
         checkCustomDoHRows();
-        checkMapDriftingFixRows();
         checkCustomTitleRows();
         checkPushServiceTypeRows();
         checkOpenArchiveOnPullRows();
@@ -303,8 +297,6 @@ public class NekoGeneralSettingsActivity extends BaseNekoXSettingsActivity {
                         ContactsController.getInstance(a).checkAppAccount();
                     }
                 }
-            } else if (key.equals(NekoConfig.useOSMDroidMap.getKey())) {
-                checkMapDriftingFixRows();
             } else if (key.equals(NaConfig.INSTANCE.getPushServiceType().getKey())) {
                 PushListenerController.reconcilePushRegistration();
                 if ((int) newValue == 0) {
@@ -468,30 +460,6 @@ public class NekoGeneralSettingsActivity extends BaseNekoXSettingsActivity {
         }
     }
 
-    private void checkMapDriftingFixRows() {
-        boolean useOSMDroid = NekoConfig.useOSMDroidMap.Bool();
-        if (listAdapter == null) {
-            if (useOSMDroid) {
-                cellGroup.rows.remove(mapDriftingFixForGoogleMapsRow);
-            }
-            return;
-        }
-        if (!useOSMDroid) {
-            final int index = cellGroup.rows.indexOf(useOSMDroidMapRow);
-            if (!cellGroup.rows.contains(mapDriftingFixForGoogleMapsRow)) {
-                cellGroup.rows.add(index + 1, mapDriftingFixForGoogleMapsRow);
-                listAdapter.notifyItemInserted(index + 1);
-            }
-        } else {
-            int rowIndex = cellGroup.rows.indexOf(mapDriftingFixForGoogleMapsRow);
-            if (rowIndex != -1) {
-                cellGroup.rows.remove(mapDriftingFixForGoogleMapsRow);
-                listAdapter.notifyItemRemoved(rowIndex);
-            }
-        }
-        addRowsToMap(cellGroup);
-    }
-
     private void checkCustomTitleRows() {
         boolean useUserName = NaConfig.INSTANCE.getCustomTitleUserName().Bool();
         if (listAdapter == null) {
@@ -518,14 +486,10 @@ public class NekoGeneralSettingsActivity extends BaseNekoXSettingsActivity {
 
     private void checkPushServiceTypeRows() {
         boolean useInApp = NaConfig.INSTANCE.getPushServiceType().Int() == 0;
-        boolean useUnified = NaConfig.INSTANCE.getPushServiceType().Int() == 2;
+        boolean useUnified = NaConfig.INSTANCE.getPushServiceType().Int() == 1;
         if (listAdapter == null) {
-            if (!useInApp) {
-                cellGroup.rows.remove(pushServiceTypeInAppDialogRow);
-            }
-            if (!useUnified) {
-                cellGroup.rows.remove(pushServiceTypeUnifiedGatewayRow);
-            }
+            if (!useInApp) cellGroup.rows.remove(pushServiceTypeInAppDialogRow);
+            if (!useUnified) cellGroup.rows.remove(pushServiceTypeUnifiedGatewayRow);
             return;
         }
         if (useInApp) {

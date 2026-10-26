@@ -29,7 +29,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.PowerManager;
-import android.os.Process;
 import android.os.SystemClock;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -39,8 +38,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
 
 import org.json.JSONObject;
 import org.telegram.messenger.utils.Choreographer60FpsContent;
@@ -60,9 +57,7 @@ import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 
 import tw.nekomimi.nekogram.NekoConfig;
-import tw.nekomimi.nekogram.utils.AndroidUtil;
 import xyz.nextalone.nagram.NaConfig;
-import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import static android.os.Build.VERSION.SDK_INT;
 
@@ -97,11 +92,9 @@ public class ApplicationLoader extends Application {
     private static PushListenerController.IPushListenerServiceProvider pushProvider;
     private static IMapsProvider mapsProvider;
     private static ILocationServiceProvider locationServiceProvider;
-    private Thread.UncaughtExceptionHandler systemUncaughtExceptionHandler;
 
     @Override
     protected void attachBaseContext(Context base) {
-        systemUncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
         super.attachBaseContext(base);
         try {
             applicationContext = getApplicationContext();
@@ -111,29 +104,17 @@ public class ApplicationLoader extends Application {
 
     public static ILocationServiceProvider getLocationServiceProvider() {
         if (locationServiceProvider == null) {
-            locationServiceProvider = new GoogleLocationProvider();
+            locationServiceProvider = new AndroidLocationProvider();
         }
         return locationServiceProvider;
     }
 
-    /*protected ILocationServiceProvider onCreateLocationServiceProvider() {
-        return new GoogleLocationProvider();
-    }*/
-
     public static IMapsProvider getMapsProvider() {
         if (mapsProvider == null) {
-            if (NekoConfig.useOSMDroidMap.Bool())
-                mapsProvider = new OSMDroidMapsProvider();
-            else {
-                mapsProvider = new GoogleMapsProvider();
-            }
+            mapsProvider = new OSMDroidMapsProvider();
         }
         return mapsProvider;
     }
-
-    /*protected IMapsProvider onCreateMapsProvider() {
-        return new GoogleMapsProvider();
-    }*/
 
     public static PushListenerController.IPushListenerServiceProvider getPushProvider() {
         if (pushProvider == null) {
@@ -276,19 +257,19 @@ public class ApplicationLoader extends Application {
         SharedConfig.loadConfig();
         NekoConfig.init();
         NaConfig.init();
+        // Historical values 1/3 selected FCM/MicroG; 2 selected UnifiedPush.
+        // Value 1 now means UnifiedPush, while 0 remains in-app-only.
+        int configuredPushService = NaConfig.INSTANCE.getPushServiceType().Int();
+        if (configuredPushService != 0 && configuredPushService != 1) {
+            NaConfig.INSTANCE.getPushServiceType().setConfigInt(1);
+        }
         LauncherIconController.tryFixLauncherIconIfNeeded();
         SharedPrefsHelper.init(applicationContext);
-        try {
-            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(AndroidUtil.shouldEnableCrashlytics());
-        } catch (IllegalStateException e) {
-            // Local development builds may not have google-services.json configured.
-            FileLog.e(e);
-        }
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
             MessagesController.getInstance(a);
             if (a == 0) {
-                SharedConfig.pushStringStatus = "__FIREBASE_GENERATING_SINCE_" + ConnectionsManager.getInstance(a).getCurrentTime() + "__";
+                SharedConfig.pushStringStatus = "__PUSH_GENERATING_SINCE_" + ConnectionsManager.getInstance(a).getCurrentTime() + "__";
             } else {
                 ConnectionsManager.getInstance(a);
             }
@@ -327,7 +308,6 @@ public class ApplicationLoader extends Application {
         }
 
         super.onCreate();
-        installCrashReportFilter();
 
         // AndroidUtilities must be initialized before FileLog
         final String helloWorld = AndroidUtilities.getHelloWorld();
@@ -474,6 +454,10 @@ public class ApplicationLoader extends Application {
     }
 
     private static void initPushServices() {
+        if (NaConfig.INSTANCE.getPushServiceType().Int() == 0) {
+            SharedConfig.pushStringStatus = "__PUSH_IN_APP_ONLY__";
+            return;
+        }
         AndroidUtilities.runOnUIThread(() -> {
             if (getPushProvider().hasServices()) {
                 getPushProvider().onRequestPushToken();
@@ -487,16 +471,6 @@ public class ApplicationLoader extends Application {
             }
         }, 1000);
     }
-
-    /*private boolean checkPlayServices() {
-        try {
-            int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
-            return resultCode == ConnectionResult.SUCCESS;
-        } catch (Exception e) {
-            FileLog.e(e);
-        }
-        return true;
-    }*/
 
     private static long lastNetworkCheck = -1;
     private static void ensureCurrentNetworkGet() {
@@ -850,20 +824,4 @@ public class ApplicationLoader extends Application {
         return null;
     }
 
-    private void installCrashReportFilter() {
-        Thread.UncaughtExceptionHandler crashlyticsHandler = Thread.getDefaultUncaughtExceptionHandler();
-        Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
-            if (AndroidUtil.shouldReportCrashToCrashlytics(error)) {
-                if (crashlyticsHandler != null) {
-                    crashlyticsHandler.uncaughtException(thread, error);
-                    return;
-                }
-            } else if (systemUncaughtExceptionHandler != null) {
-                systemUncaughtExceptionHandler.uncaughtException(thread, error);
-                return;
-            }
-            Process.killProcess(Process.myPid());
-            System.exit(10);
-        });
-    }
 }
