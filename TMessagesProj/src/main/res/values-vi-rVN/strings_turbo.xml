@@ -146,4 +146,6 @@
     <string name="DownloadSpeedBoost">Tăng tốc tải xuống</string>
     <string name="DownloadSpeedBoostAbout">Thử nghiệm: nâng giới hạn tải xuống lên cấp Premium. Giới hạn máy chủ đôi khi có thể làm chậm lại việc tải xuống.</string>
     <string name="DownloadingSettings">Mạng</string>
+    <string name="FontBoldSyntheticThickening">Làm dày chữ in đậm</string>
+    <string name="FontBoldSyntheticThickeningAbout">Nếu phông chữ in đậm không có độ đậm thực tế, nó sẽ được làm dày nhân tạo. Tắt để sử dụng độ đậm riêng của nó.</string>
 </resources>

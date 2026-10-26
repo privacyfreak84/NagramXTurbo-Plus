@@ -146,4 +146,6 @@
     <string name="DownloadSpeedBoost">다운로드 속도 부스트</string>
     <string name="DownloadSpeedBoostAbout">실험적 기능: 다운로드 제한을 Premium 수준으로 높입니다. 서버 제한으로 인해 다운로드가 다시 느려질 수 있습니다.</string>
     <string name="DownloadingSettings">네트워크</string>
+    <string name="FontBoldSyntheticThickening">굵은 텍스트 두껍게</string>
+    <string name="FontBoldSyntheticThickeningAbout">굵은 글꼴에 실제 볼드 굵기가 없으면 인위적으로 두껍게 처리됩니다. 본래 굵기를 사용하려면 끄세요.</string>
 </resources>

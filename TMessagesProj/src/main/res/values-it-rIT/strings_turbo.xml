@@ -146,4 +146,6 @@
     <string name="DownloadSpeedBoost">Accelerazione dei download</string>
     <string name="DownloadSpeedBoostAbout">Sperimentale: porta i limiti di download al livello Premium. I limiti del server possono talvolta rallentare di nuovo i download.</string>
     <string name="DownloadingSettings">Rete</string>
+    <string name="FontBoldSyntheticThickening">Ispessisci il testo in grassetto</string>
+    <string name="FontBoldSyntheticThickeningAbout">Se il font in grassetto non ha un vero peso in grassetto, viene ispessito artificialmente. Disattiva per usare il proprio peso.</string>
 </resources>

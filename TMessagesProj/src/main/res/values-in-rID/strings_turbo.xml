@@ -146,4 +146,6 @@
     <string name="DownloadSpeedBoost">Percepatan Unduhan</string>
     <string name="DownloadSpeedBoostAbout">Eksperimental: menaikkan batas unduhan ke level Premium. Batas server kadang dapat memperlambat unduhan kembali.</string>
     <string name="DownloadingSettings">Jaringan</string>
+    <string name="FontBoldSyntheticThickening">Pertebal teks tebal</string>
+    <string name="FontBoldSyntheticThickeningAbout">Jika font tebal tidak memiliki bobot tebal asli, font akan dipertebal secara artifisial. Matikan untuk menggunakan bobot aslinya.</string>
 </resources>

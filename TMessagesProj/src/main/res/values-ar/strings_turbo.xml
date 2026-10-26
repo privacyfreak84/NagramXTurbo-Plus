@@ -150,4 +150,6 @@
     <string name="DownloadSpeedBoost">تسريع التنزيل</string>
     <string name="DownloadSpeedBoostAbout">تجريبي: يرفع حدود التنزيل إلى مستوى Premium. قد تُبطئ حدود الخادم التنزيل مرة أخرى أحيانًا.</string>
     <string name="DownloadingSettings">الشبكة</string>
+    <string name="FontBoldSyntheticThickening">تثخين النص العريض</string>
+    <string name="FontBoldSyntheticThickeningAbout">إذا لم يكن للخط العريض وزن عريض حقيقي، فسيتم تثخينه اصطناعيًا. أوقف التشغيل لاستخدام وزنه الأصلي.</string>
 </resources>

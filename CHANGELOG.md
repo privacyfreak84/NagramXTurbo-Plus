@@ -4,13 +4,14 @@ Differences between Nagram X Turbo and [Nagram X](https://github.com/risin42/Nag
 
 ## Upstream
 
-Synced with Telegram 13.0.2. User-visible from upstream since 12.10.6:
-- Built-in TON Wallet: manage TON right in the app — wallet entry in settings and the chats menu, money transfers in chats
-- Calls: updated calling engine, with call audio routed to LE Audio headsets on Android 12+
-- Video: widescreen videos now fit the player correctly in landscape
-- Proxies: FakeTLS connection stability fix
-- Faster and more accurate code syntax highlighting in messages and articles
-- Misc upstream fixes across 13.0.0–13.0.2
+Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
+- Voice messages: optional new recorder with noise suppression (RNNoise) — toggle in Settings
+- Bot keyboards: the system Back button no longer gets stuck when a bot keyboard stays open
+- Sharing: "Send as file" works again when sharing photos and videos from the gallery
+- Email login: clearer error when your email provider is not allowed
+- Links opened from Instant View now respect the in-app browser settings
+- Profile gifts: fixed item alignment
+- Bots: new type labels (Agent, Game, App, AI)
 
 ## Features
 
@@ -48,6 +49,7 @@ Synced with Telegram 13.0.2. User-visible from upstream since 12.10.6:
 
 ### Custom fonts
 - Pick a font by category: Regular / Bold / Italic / Mono
+- "Thicken bold text" toggle (Turbo → Fonts): when your bold font has no real bold weight, turn thickening off to render bold text with the font's own weight — for thin font pairs like Light + Regular
 - Import your own `.ttf`/`.otf` straight from chat (tap — preview, long-press — apply)
 - Text size in every input field + cursor scaling
 

@@ -146,4 +146,6 @@
     <string name="DownloadSpeedBoost">下載加速</string>
     <string name="DownloadSpeedBoostAbout">實驗性功能：將下載限制提升至 Premium 級別。伺服器限制有時可能會使下載速度再次變慢。</string>
     <string name="DownloadingSettings">網路</string>
+    <string name="FontBoldSyntheticThickening">加粗粗體文字</string>
+    <string name="FontBoldSyntheticThickeningAbout">若粗體字型沒有真正的粗體字重，將以人工方式加粗。關閉以使用其本身的字重。</string>
 </resources>

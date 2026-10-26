@@ -148,4 +148,6 @@
     <string name="DownloadSpeedBoost">Przyspieszanie pobierania</string>
     <string name="DownloadSpeedBoostAbout">Eksperymentalne: podnosi limity pobierania do poziomu Premium. Limity serwera mogą czasami ponownie spowalniać pobieranie.</string>
     <string name="DownloadingSettings">Sieć</string>
+    <string name="FontBoldSyntheticThickening">Pogrubiaj pogrubiony tekst</string>
+    <string name="FontBoldSyntheticThickeningAbout">Jeśli pogrubiona czcionka nie ma prawdziwego pogrubienia, jest sztucznie pogrubiana. Wyłącz, aby użyć jej własnej grubości.</string>
 </resources>

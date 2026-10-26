@@ -106,6 +106,8 @@
     <string name="FontCategoryItalic">Italic</string>
     <string name="FontCategoryMono">Monospace</string>
     <string name="FontDefault">Default</string>
+    <string name="FontBoldSyntheticThickening">Thicken bold text</string>
+    <string name="FontBoldSyntheticThickeningAbout">If the bold font has no real bold weight, it gets thickened artificially. Turn off to use its own weight.</string>
     <string name="FontReset">Reset All Fonts</string>
     <string name="FontResetConfirm">Reset all custom fonts to default?</string>
     <string name="FontImportFromFile">Import from file…</string>

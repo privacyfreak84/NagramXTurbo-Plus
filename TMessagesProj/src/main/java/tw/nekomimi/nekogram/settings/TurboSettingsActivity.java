@@ -241,6 +241,7 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
     private final AbstractConfigCell fontBoldRow = cellGroup.appendCell(new ConfigCellCustom("FontBold", ConfigCellCustom.CUSTOM_ITEM_FontBold, true));
     private final AbstractConfigCell fontItalicRow = cellGroup.appendCell(new ConfigCellCustom("FontItalic", ConfigCellCustom.CUSTOM_ITEM_FontItalic, true));
     private final AbstractConfigCell fontMonoRow = cellGroup.appendCell(new ConfigCellCustom("FontMono", ConfigCellCustom.CUSTOM_ITEM_FontMono, true));
+    private final AbstractConfigCell fontBoldThickeningRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getFontBoldSyntheticThickening(), getString(R.string.FontBoldSyntheticThickeningAbout)));
     private final AbstractConfigCell fontResetRow = cellGroup.appendCell(new ConfigCellCustom("FontReset", ConfigCellCustom.CUSTOM_ITEM_FontReset, true));
     private final AbstractConfigCell dividerFonts = cellGroup.appendCell(new ConfigCellDivider());
     private final AbstractConfigCell headerCalls = cellGroup.appendCell(new ConfigCellHeader(getString(R.string.Calls)));

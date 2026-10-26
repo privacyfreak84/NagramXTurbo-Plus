@@ -148,4 +148,6 @@
     <string name="DownloadSpeedBoost">Прискорення завантаження</string>
     <string name="DownloadSpeedBoostAbout">Експериментально: підвищує ліміти завантаження до рівня Premium. Серверні обмеження можуть іноді знову сповільнювати завантаження.</string>
     <string name="DownloadingSettings">Мережа</string>
+    <string name="FontBoldSyntheticThickening">Потовщувати жирний текст</string>
+    <string name="FontBoldSyntheticThickeningAbout">Якщо жирний шрифт не має справжнього жирного накреслення, він потовщується штучно. Вимкніть, щоб використовувати його власну вагу.</string>
 </resources>

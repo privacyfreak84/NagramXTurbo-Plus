@@ -32,7 +32,7 @@ gradle.ext.androidxMediaSettingsDir = androidxMediaRoot.getCanonicalPath()
 def androidxMediaLibraries = [
         'common', 'container', 'database', 'datasource', 'decoder', 'extractor',
         'exoplayer', 'exoplayer_dash', 'exoplayer_hls', 'decoder_ffmpeg', 'session',
-        'effect', 'muxer', 'transformer',
+        'effect', 'muxer', 'transformer', 'inspector', 'inspector_frame',
 ]
 androidxMediaLibraries.each { lib ->
     def module = ":${gradle.ext.androidxMediaModulePrefix}lib-${lib.replace('_', '-')}"

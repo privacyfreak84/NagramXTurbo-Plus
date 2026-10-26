@@ -146,4 +146,6 @@
     <string name="DownloadSpeedBoost">افزایش سرعت دانلود</string>
     <string name="DownloadSpeedBoostAbout">آزمایشی: محدودیت‌های دانلود را به سطح Premium می‌رساند. محدودیت‌های سرور گاهی ممکن است دانلود را دوباره کند کند.</string>
     <string name="DownloadingSettings">شبکه</string>
+    <string name="FontBoldSyntheticThickening">ضخیم‌تر کردن متن پررنگ</string>
+    <string name="FontBoldSyntheticThickeningAbout">اگر فونت پررنگ وزن پررنگ واقعی نداشته باشد، به‌طور مصنوعی ضخیم‌تر می‌شود. برای استفاده از وزن خودش خاموش کنید.</string>
 </resources>

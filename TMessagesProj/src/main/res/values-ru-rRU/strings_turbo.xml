@@ -108,6 +108,8 @@
     <string name="FontCategoryItalic">Курсив</string>
     <string name="FontCategoryMono">Моноширокий</string>
     <string name="FontDefault">По умолчанию</string>
+    <string name="FontBoldSyntheticThickening">Утолщать жирный текст</string>
+    <string name="FontBoldSyntheticThickeningAbout">Если у жирного шрифта нет настоящего жирного начертания, он утолщается искусственно. Выключите, чтобы использовать его собственный вес.</string>
     <string name="FontReset">Сбросить все шрифты</string>
     <string name="FontResetConfirm">Сбросить все пользовательские шрифты к стандартным?</string>
     <string name="FontImportFromFile">Импорт из файла…</string>

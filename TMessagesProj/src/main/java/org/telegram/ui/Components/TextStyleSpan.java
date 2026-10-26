@@ -115,6 +115,9 @@ public class TextStyleSpan extends MetricAffectingSpan {
             if ((flags & FLAG_STYLE_BOLD) == 0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
                 return false;
             }
+            if (!xyz.nextalone.nagram.NaConfig.INSTANCE.getFontBoldSyntheticThickening().Bool()) {
+                return false;
+            }
             Typeface customTf = TypefaceHelper.getTypefaceForStyle(true,
                     (flags & FLAG_STYLE_ITALIC) != 0,
                     (flags & FLAG_STYLE_MONO) != 0 || (flags & FLAG_STYLE_CODE) != 0);

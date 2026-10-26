@@ -6,7 +6,7 @@
 
 A fork of the [Nagram X](https://github.com/risin42/NagramX) **Telegram client for Android** with bug fixes and focused UX tweaks — no flashy widgets, just the small things that make everyday use a bit nicer. Separate package (`nu.gpu.nagramxturbo`), keystore and remote-config: an independent app that installs alongside Nagram X or the official Telegram client (chats are shared per account).
 
-Based on Nagram X [12.10.0-a6c7d0a](https://github.com/risin42/NagramX/commit/a6c7d0aec95f829a63aaa7bc591b8e809af84636) — the final Nagram X release (the project is now archived) — with Telegram updates applied directly from the official client source; currently synced to Telegram [13.0.2-f32ffee](https://github.com/DrKLO/Telegram/commit/f32ffeec763f0bdbf4bec25b52d654f77bff733d).
+Based on Nagram X [12.10.0-a6c7d0a](https://github.com/risin42/NagramX/commit/a6c7d0aec95f829a63aaa7bc591b8e809af84636) — the final Nagram X release (the project is now archived) — with Telegram updates applied directly from the official client source; currently synced to Telegram [13.0.3-0aae959](https://github.com/DrKLO/Telegram/commit/0aae959806c57be8ad457980f2a5c6277ff18635).
 
 Turbo updates on its own — in-app updates work independently of Nagram X.
 
@@ -25,7 +25,7 @@ Turbo updates on its own — in-app updates work independently of Nagram X.
 - **Hide encryption emoji in calls** (Turbo → Calls, off by default): the emoji row shown in calls that looks like an encryption status — one-on-one calls show no row, group calls keep the "Encrypted" cell but without the emoji.
 - **Auto-mute on join** (Turbo → Notifications, off by default): every channel or group you join — Join button, search or an invite link — starts muted; unmute it manually whenever you want.
 - **Message date in bubbles** (Turbo → Media, off by default): the sending date next to the time in every message — no need to open the message details to see when it was sent; date format selector (9 patterns with a live preview in the settings).
-- **Custom fonts**: pick by category (Regular / Bold / Italic / Mono), import your own `.ttf`/`.otf` from chat, text size in every input field.
+- **Custom fonts**: pick by category (Regular / Bold / Italic / Mono), import your own `.ttf`/`.otf` from chat, text size in every input field, optional synthetic thickening of bold text without a real bold weight.
 - **Numeric-id profile links**: the `tg://openmessage?user_id=`, `tg://user?id=` and `t.me/@id` links our profile sheet copies now open the chat even for users not in your local cache (server-side resolve); broken links show a clear message.
 - **In-chat search by user id**: in group and supergroup search, type `from:<id>` (or `id:<id>`) and press search — all messages from that sender, even one who left the group or is only known by id (from a forwarded message, an admin log); words after the id search inside their messages; unknown ids are resolved on the server.
 - **Media viewer**: swipe GIFs with photos and videos (toggle, off by default), instant swipe in large chats, optional scroll-to-seen-photo on close, seamless video handoff (opens at preview position, resumes on close/scroll-back; off by default), auto-rotate button (off / fit content / always), Photo HDR toggle (on by default), editor pencil auto-downloads missing media (progress dialog, asks for files over 100 MB) and is available for videos too.
