@@ -4,7 +4,6 @@ import org.telegram.messenger.LocaleController.getString
 import org.telegram.messenger.R
 import tw.nekomimi.nekogram.NekoConfig
 import tw.nekomimi.nekogram.config.ConfigItem
-import tw.nekomimi.nekogram.llm.net.VertexGeminiClient
 import tw.nekomimi.nekogram.llm.preset.PresetRegistry
 import tw.nekomimi.nekogram.llm.utils.UrlNormalizer
 import tw.nekomimi.nekogram.translate.Translator
@@ -14,9 +13,6 @@ object LlmConfig {
 
     @JvmStatic
     fun getDefaultModelName(preset: Int): String {
-        if (preset == PresetRegistry.GOOGLE_AGENT_PLATFORM) {
-            return VertexGeminiClient.MODELS[0]
-        }
         return getString(PresetRegistry.getDefaultModelResId(preset))
     }
 
@@ -24,7 +20,6 @@ object LlmConfig {
     fun getSavedModelName(preset: Int): String {
         val value = when (preset) {
             PresetRegistry.OPENAI -> NaConfig.llmProviderOpenAIModel.String()
-            PresetRegistry.GOOGLE_AI_STUDIO -> NaConfig.llmProviderGeminiModel.String()
             PresetRegistry.GROQ -> NaConfig.llmProviderGroqModel.String()
             PresetRegistry.DEEPSEEK -> NaConfig.llmProviderDeepSeekModel.String()
             PresetRegistry.XAI -> NaConfig.llmProviderXAIModel.String()
@@ -32,7 +27,6 @@ object LlmConfig {
             PresetRegistry.OLLAMA_CLOUD -> NaConfig.llmProviderOllamaCloudModel.String()
             PresetRegistry.OPENROUTER -> NaConfig.llmProviderOpenRouterModel.String()
             PresetRegistry.VERCEL_AI_GATEWAY -> NaConfig.llmProviderVercelAIGatewayModel.String()
-            PresetRegistry.GOOGLE_AGENT_PLATFORM -> NaConfig.llmProviderVertexModel.String()
             else -> NaConfig.llmModelName.String()
         }
         return value?.trim() ?: ""
@@ -43,7 +37,6 @@ object LlmConfig {
         val value = model?.trim() ?: ""
         when (preset) {
             PresetRegistry.OPENAI -> NaConfig.llmProviderOpenAIModel.setConfigString(value)
-            PresetRegistry.GOOGLE_AI_STUDIO -> NaConfig.llmProviderGeminiModel.setConfigString(value)
             PresetRegistry.GROQ -> NaConfig.llmProviderGroqModel.setConfigString(value)
             PresetRegistry.DEEPSEEK -> NaConfig.llmProviderDeepSeekModel.setConfigString(value)
             PresetRegistry.XAI -> NaConfig.llmProviderXAIModel.setConfigString(value)
@@ -51,7 +44,6 @@ object LlmConfig {
             PresetRegistry.OLLAMA_CLOUD -> NaConfig.llmProviderOllamaCloudModel.setConfigString(value)
             PresetRegistry.OPENROUTER -> NaConfig.llmProviderOpenRouterModel.setConfigString(value)
             PresetRegistry.VERCEL_AI_GATEWAY -> NaConfig.llmProviderVercelAIGatewayModel.setConfigString(value)
-            PresetRegistry.GOOGLE_AGENT_PLATFORM -> NaConfig.llmProviderVertexModel.setConfigString(value)
             else -> NaConfig.llmModelName.setConfigString(value)
         }
     }
@@ -86,7 +78,6 @@ object LlmConfig {
     fun getApiKeyConfigItem(preset: Int): ConfigItem {
         return when (preset) {
             PresetRegistry.OPENAI -> NaConfig.llmProviderOpenAIKey
-            PresetRegistry.GOOGLE_AI_STUDIO -> NaConfig.llmProviderGeminiKey
             PresetRegistry.GROQ -> NaConfig.llmProviderGroqKey
             PresetRegistry.DEEPSEEK -> NaConfig.llmProviderDeepSeekKey
             PresetRegistry.XAI -> NaConfig.llmProviderXAIKey
@@ -94,7 +85,6 @@ object LlmConfig {
             PresetRegistry.OLLAMA_CLOUD -> NaConfig.llmProviderOllamaCloudKey
             PresetRegistry.OPENROUTER -> NaConfig.llmProviderOpenRouterKey
             PresetRegistry.VERCEL_AI_GATEWAY -> NaConfig.llmProviderVercelAIGatewayKey
-            PresetRegistry.GOOGLE_AGENT_PLATFORM -> NaConfig.llmProviderVertexKey
             else -> NaConfig.llmApiKey
         }
     }
@@ -115,7 +105,6 @@ object LlmConfig {
         val llmProvider = NaConfig.llmProviderPreset.Int()
         val keyConfig = when (llmProvider) {
             PresetRegistry.OPENAI -> NaConfig.llmProviderOpenAIKey
-            PresetRegistry.GOOGLE_AI_STUDIO -> NaConfig.llmProviderGeminiKey
             PresetRegistry.GROQ -> NaConfig.llmProviderGroqKey
             PresetRegistry.DEEPSEEK -> NaConfig.llmProviderDeepSeekKey
             PresetRegistry.XAI -> NaConfig.llmProviderXAIKey
@@ -123,7 +112,6 @@ object LlmConfig {
             PresetRegistry.OLLAMA_CLOUD -> NaConfig.llmProviderOllamaCloudKey
             PresetRegistry.OPENROUTER -> NaConfig.llmProviderOpenRouterKey
             PresetRegistry.VERCEL_AI_GATEWAY -> NaConfig.llmProviderVercelAIGatewayKey
-            PresetRegistry.GOOGLE_AGENT_PLATFORM -> NaConfig.llmProviderVertexKey
             else -> NaConfig.llmApiKey
         }
         return keyConfig.String().isNotEmpty()
