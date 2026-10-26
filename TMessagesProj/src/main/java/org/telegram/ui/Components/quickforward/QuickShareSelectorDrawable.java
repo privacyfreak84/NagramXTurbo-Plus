@@ -57,7 +57,7 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
         public static int AVATAR_RADIUS = 21;
         public static int AVATAR = AVATAR_RADIUS * 2;
         public static int GAP = 11;
-        public static int BUBBLE_HEIGHT = AVATAR + PADDING_V * 2;
+        public static int BUBBLE_HEIGHT = 218;
         public static int CLOSE_AVATAR_JUMP_HEIGHT = 15;
         public static int TEXT_PADDING_INTERNAL = 8;
         public static int TEXT_PADDING_EXTERNAL = 16;
@@ -70,7 +70,7 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
     private static final int[] tmpCords = new int[2];
 
     public int getBubbleWidth () {
-        return dp((Sizes.AVATAR + Sizes.GAP) * avatarCells.length - Sizes.GAP + Sizes.PADDING_H * 2);
+        return dp(218);
     }
 
     public final QuickShareSelectorOverlayLayout parent;
@@ -88,7 +88,15 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
     private final RectF ballLeft = new RectF();
     private final RectF ballRight = new RectF();
 
+    private static final int REACTION_ACTION_COUNT = 4;
+    private static final float REACTION_ORBIT_DP = 73f;
+    private static final float DESTINATION_ORBIT_DP = 39f;
+
     private final QuickShareAvatarCell[] avatarCells;
+    private final String[] reactionEmojis;
+    private final Paint wheelActionBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint wheelActionTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint wheelActionOutlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Drawable shadowDrawable;
     public final ChatMessageCell cell;
     public final MessageObject messageObject;
@@ -110,6 +118,7 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
 
     private boolean ballsAllowed = true;
     private int selectedIndex = -1;
+    private int selectedActionIndex = -1;
     private boolean isReady;
     private boolean isDestroyed;
 
@@ -128,6 +137,7 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
         this.messageObject = cell.getMessageObject();
         this.key = key;
 
+        reactionEmojis = cell.getQuickReactionWheelEmojis();
         avatarCells = new QuickShareAvatarCell[Math.min(5, dialogs.size())];
 
         for (int i = 0; i < avatarCells.length; i++) {
@@ -197,15 +207,7 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
 
         bubbleStart.set(buttonCx - r, buttonCy - r, buttonCx + r, buttonCy + r);
 
-        float padding = dp(16);
-        if (bubbleStart.right + dp(48) + padding > parent.getMeasuredWidth()) {
-            bubbleOffset = Math.max(0, parent.getMeasuredWidth() - padding - bubbleStart.right);
-        } else if (bubbleStart.right + dp(48) - getBubbleWidth() - padding < 0) {
-            float targetRight = padding + getBubbleWidth();
-            bubbleOffset = Math.max(0, targetRight - bubbleStart.right );
-        } else {
-            bubbleOffset = dp(48);
-        }
+        bubbleOffset = 0f;
     }
 
     private void prepare () {
@@ -220,17 +222,45 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
     }
 
     public void onTouchMoveEvent (float touchX, float touchY) {
-        if (!openAnimationCompleted) {
+        if (!openAnimationCompleted || closeAnimationStarted) {
             return;
         }
 
-        final float x = touchX - bubbleCurrent.left + offsetX;
-        final float y = touchY - bubbleCurrent.top + offsetY;
-        final int indexH = (int) Math.floor((x - ((dp(Sizes.PADDING_H) - dp(Sizes.GAP) / 2f))) / dp(Sizes.AVATAR + Sizes.GAP));
-        final int index = (-dp(21 + Sizes.TEXT_PADDING_EXTERNAL)) < y && y < bubbleCurrent.height() ?
-            MathUtils.clamp(indexH, 0, avatarCells.length - 1) : -1;
+        final float x = touchX + offsetX;
+        final float y = touchY + offsetY;
+        final float hitRadius = dp(25);
+        final float hitRadiusSquared = hitRadius * hitRadius;
+        int actionIndex = -1;
 
-        setIndex(index);
+        // Reaction positions stay tied to their compass directions: Like up,
+        // Heart right, Fire down, Laugh left. Disabled reactions are omitted.
+        for (int i = 0; i < REACTION_ACTION_COUNT; i++) {
+            if (reactionEmojis[i] == null || reactionEmojis[i].isEmpty()) {
+                continue;
+            }
+            PointF center = reactionCenter(i);
+            float dx = x - center.x;
+            float dy = y - center.y;
+            if (dx * dx + dy * dy <= hitRadiusSquared) {
+                actionIndex = i;
+                break;
+            }
+        }
+
+        // Forwarding destinations occupy the inner orbit.
+        if (actionIndex == -1) {
+            for (int i = 0; i < avatarCells.length; i++) {
+                PointF center = destinationCenter(i);
+                float dx = x - center.x;
+                float dy = y - center.y;
+                if (dx * dx + dy * dy <= hitRadiusSquared) {
+                    actionIndex = REACTION_ACTION_COUNT + i;
+                    break;
+                }
+            }
+        }
+
+        setSelectedActionIndex(actionIndex);
     }
 
     public void close(Bulletin bulletin) {
@@ -292,6 +322,32 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
         }
 
         return 0;
+    }
+
+    public String getSelectedReactionEmoji() {
+        if (selectedActionIndex >= 0 && selectedActionIndex < REACTION_ACTION_COUNT) {
+            return reactionEmojis[selectedActionIndex];
+        }
+        return null;
+    }
+
+    private PointF reactionCenter(int index) {
+        double angle = -Math.PI / 2.0 + index * Math.PI / 2.0;
+        float radius = dp(REACTION_ORBIT_DP) * Interpolators.avatarOvershootCancel.getInterpolation(openProgress);
+        return new PointF(
+                bubbleCurrent.centerX() + (float) Math.cos(angle) * radius,
+                bubbleCurrent.centerY() + (float) Math.sin(angle) * radius
+        );
+    }
+
+    private PointF destinationCenter(int index) {
+        int count = Math.max(1, avatarCells.length);
+        double angle = -Math.PI / 2.0 + (Math.PI * 2.0 * index) / count + Math.PI / count;
+        float radius = dp(DESTINATION_ORBIT_DP) * Interpolators.avatarOvershootCancel.getInterpolation(openProgress);
+        return new PointF(
+                bubbleCurrent.centerX() + (float) Math.cos(angle) * radius,
+                bubbleCurrent.centerY() + (float) Math.sin(angle) * radius
+        );
     }
 
     public void destroy () {
@@ -374,10 +430,9 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
                 float alpha = 1 - Interpolators.closeAvatarAlpha.getInterpolation(closeProgress);
                 float position = Interpolators.closeAvatarPosition.getInterpolation(closeProgress);
 
-                final int offset = selectedIndex - 2;
-
-                final float x1 = bubbleCurrent.centerX() + dp((Sizes.AVATAR + Sizes.GAP)) * offset;
-                final float y1 = bubbleCurrent.centerY();
+                final PointF selectedCenter = destinationCenter(selectedIndex);
+                final float x1 = selectedCenter.x;
+                final float y1 = selectedCenter.y;
 
                 final float x2 = bulletinImageCx;
                 final float y2 = bulletinImageCy;
@@ -445,33 +500,75 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
         final float radius1 = dp(Sizes.AVATAR + 2) * Interpolators.avatar1.getInterpolation(openProgress) / 2f - radiusOffset;
         final float radius2 = dp(Sizes.AVATAR + 2) * Interpolators.avatar2.getInterpolation(openProgress) / 2f - radiusOffset;
         final float radius3 = dp(Sizes.AVATAR + 2) * Interpolators.avatar3.getInterpolation(openProgress) / 2f - radiusOffset;
+        drawWheelActions(canvas, alpha, radius1, radius2, radius3);
+    }
 
-        for (int k = 0; k < 2; k++) {
+    private void drawWheelActions(Canvas canvas, float alpha, float radius1, float radius2, float radius3) {
+        final int iconColor = Theme.getColor(Theme.key_actionBarDefaultIcon, cell.getResourcesProvider());
+        final int surfaceColor = Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, cell.getResourcesProvider());
+        final int paintAlpha = (int) (Math.max(0f, Math.min(1f, alpha)) * 255);
+
+        // Theme-aware, nearly opaque action chips keep emojis readable over the
+        // blur without the old black blobs or floating text labels.
+        wheelActionBgPaint.setColor(surfaceColor);
+        wheelActionBgPaint.setAlpha((int) (paintAlpha * 0.96f));
+        wheelActionTextPaint.setColor(iconColor);
+        wheelActionTextPaint.setAlpha(paintAlpha);
+        wheelActionTextPaint.setTextAlign(Paint.Align.CENTER);
+        wheelActionTextPaint.setTextSize(dp(23));
+        wheelActionOutlinePaint.setColor(iconColor);
+        wheelActionOutlinePaint.setAlpha((int) (paintAlpha * 0.35f));
+        wheelActionOutlinePaint.setStyle(Paint.Style.STROKE);
+        wheelActionOutlinePaint.setStrokeWidth(dp(1));
+
+        for (int i = 0; i < REACTION_ACTION_COUNT; i++) {
+            if (reactionEmojis[i] == null || reactionEmojis[i].isEmpty()) {
+                continue;
+            }
+            PointF center = reactionCenter(i);
+            canvas.drawCircle(center.x, center.y, dp(19), wheelActionBgPaint);
+            canvas.drawCircle(center.x, center.y, dp(19), wheelActionOutlinePaint);
+            if (selectedActionIndex == i) {
+                wheelActionOutlinePaint.setAlpha(paintAlpha);
+                wheelActionOutlinePaint.setStrokeWidth(dp(2));
+                canvas.drawCircle(center.x, center.y, dp(21), wheelActionOutlinePaint);
+                wheelActionOutlinePaint.setAlpha((int) (paintAlpha * 0.35f));
+                wheelActionOutlinePaint.setStrokeWidth(dp(1));
+            }
+            float baseline = center.y - (wheelActionTextPaint.ascent() + wheelActionTextPaint.descent()) / 2f;
+            canvas.drawText(reactionEmojis[i], center.x, baseline, wheelActionTextPaint);
+        }
+
+        // Draw the selected recipient last. Recipient name bubbles are disabled
+        // by drawWheel(), leaving a clean icon/avatar-only radial menu.
+        for (int pass = 0; pass < 2; pass++) {
             for (int i = 0; i < avatarCells.length; i++) {
-                if (k == 0 && i == selectedIndex || k == 1 && i != selectedIndex) {
+                if (pass == 0 && i == selectedIndex || pass == 1 && i != selectedIndex) {
                     continue;
                 }
-
-                final float offset = i - (avatarCells.length / 2f - 0.5f);
                 final float radius;
-                if (i == 2) {
+                if (i == 0) {
                     radius = radius1;
-                } else if (i == 1 || i == 3) {
+                } else if (i == 1 || i == 4) {
                     radius = radius2;
                 } else {
                     radius = radius3;
                 }
-
-                float cx = bubbleCurrent.centerX() + dp(Sizes.AVATAR + Sizes.GAP) * offset;
-                float cy = bubbleCurrent.centerY();
-                avatarCells[i].draw(canvas,
-                    dp(Sizes.TEXT_PADDING_EXTERNAL),
-                    parent.getMeasuredWidth() - dp(Sizes.TEXT_PADDING_EXTERNAL),
-                    bubbleCurrent.left,
-                    bubbleCurrent.right,
-                    cx, cy, radius, alpha,
-                    i == selectedIndex && closeAnimationStarted
-                );
+                PointF center = destinationCenter(i);
+                avatarCells[i].drawWheel(canvas,
+                        dp(Sizes.TEXT_PADDING_EXTERNAL),
+                        parent.getMeasuredWidth() - dp(Sizes.TEXT_PADDING_EXTERNAL),
+                        bubbleCurrent.left,
+                        bubbleCurrent.right,
+                        center.x, center.y, radius, alpha, false);
+                if (selectedActionIndex == REACTION_ACTION_COUNT + i) {
+                    wheelActionOutlinePaint.setColor(iconColor);
+                    wheelActionOutlinePaint.setAlpha(paintAlpha);
+                    wheelActionOutlinePaint.setStrokeWidth(dp(2));
+                    canvas.drawCircle(center.x, center.y, Math.max(radius, dp(21)) + dp(2), wheelActionOutlinePaint);
+                    wheelActionOutlinePaint.setAlpha((int) (paintAlpha * 0.35f));
+                    wheelActionOutlinePaint.setStrokeWidth(dp(1));
+                }
             }
         }
     }
@@ -501,13 +598,27 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
         final float bubbleWidth = Math.max(fromTo(buttonCurrent.width(), getBubbleWidth() + dp(10) * overshoot,
                 Interpolators.widthExpansion.getInterpolation(openProgress)), bubbleHalfHeight * 2f);
 
-        final float bubbleRight = bubbleStart.centerX() + bubbleHalfHeight
-                + Math.min(dp(-12) + bubbleOffset, (bubbleWidth - Math.max(buttonCurrent.width(), bubbleHalfHeight * 2f)) / 2f)
-                * Interpolators.widthExpansion.getInterpolation(openProgress);
+        final float halfWheel = dp(Sizes.BUBBLE_HEIGHT) / 2f;
+        final float horizontalPadding = dp(10);
+        final float minCenterX = halfWheel + horizontalPadding;
+        final float maxCenterX = parent.getMeasuredWidth() - halfWheel - horizontalPadding;
+        float targetCenterX = buttonCurrent.centerX();
+        if (maxCenterX >= minCenterX) {
+            targetCenterX = MathUtils.clamp(targetCenterX, minCenterX, maxCenterX);
+        }
+        final float bubbleCX = fromTo(buttonCurrent.centerX(), targetCenterX,
+                Interpolators.widthExpansion.getInterpolation(openProgress));
 
-        final float bubbleCX = bubbleRight - bubbleWidth / 2f;
-        final float bubbleCY = bubbleStart.bottom - bubbleHalfHeight - 1f - (dp(53 - 15) + dp(6) * overshoot) *
-                Interpolators.bubbleY.getInterpolation(openProgress);
+        final float verticalPadding = dp(10);
+        final float minCenterY = halfWheel + verticalPadding;
+        final float maxCenterY = parent.getMeasuredHeight() - halfWheel - verticalPadding;
+        float targetCenterY = buttonCurrent.centerY() - dp(8);
+        if (maxCenterY >= minCenterY) {
+            targetCenterY = MathUtils.clamp(targetCenterY, minCenterY, maxCenterY);
+        }
+        final float bubbleCY = fromTo(buttonCurrent.centerY(), targetCenterY,
+                Interpolators.bubbleY.getInterpolation(openProgress));
+        final float bubbleRight = bubbleCX + bubbleWidth / 2f;
 
         bubbleCurrent.left = bubbleRight - bubbleWidth;
         bubbleCurrent.top = bubbleCY - bubbleHalfHeight;
@@ -590,17 +701,27 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
         }
     }
 
-    private void setIndex (int index) {
-        if (selectedIndex == index) {
+    private void setSelectedActionIndex(int actionIndex) {
+        final int maxIndex = REACTION_ACTION_COUNT + avatarCells.length - 1;
+        if (actionIndex < -1 || actionIndex > maxIndex) {
+            actionIndex = -1;
+        }
+        if (actionIndex >= 0 && actionIndex < REACTION_ACTION_COUNT
+                && (reactionEmojis[actionIndex] == null || reactionEmojis[actionIndex].isEmpty())) {
+            actionIndex = -1;
+        }
+        if (selectedActionIndex == actionIndex) {
             return;
         }
 
         if (!NekoConfig.disableVibration.Bool()) parent.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-        selectedIndex = index;
+        selectedActionIndex = actionIndex;
+        selectedIndex = actionIndex >= REACTION_ACTION_COUNT ? actionIndex - REACTION_ACTION_COUNT : -1;
         for (int i = 0; i < avatarCells.length; i++) {
-            avatarCells[i].setSelected(index == i, true);
-            avatarCells[i].setFullVisible(index == i || index == -1, true);
+            avatarCells[i].setSelected(selectedIndex == i, true);
+            avatarCells[i].setFullVisible(selectedIndex == i || selectedIndex == -1, true);
         }
+        invalidateSelf();
     }
 
     private void buildPath(

@@ -18,6 +18,7 @@ import org.telegram.messenger.UserObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Components.Bulletin;
+import xyz.nextalone.nagram.NaConfig;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -86,6 +87,14 @@ public class QuickShareSelectorOverlayLayout extends View {
         return 0;
     }
 
+    public String getSelectedReactionEmoji(ChatMessageCell cell) {
+        final QuickShareSelectorDrawable drawable = drawableHashMap.get(key(cell));
+        if (drawable != null) {
+            return drawable.getSelectedReactionEmoji();
+        }
+        return null;
+    }
+
     public MessageObject getSelectedMessageObject(ChatMessageCell cell) {
         final QuickShareSelectorDrawable drawable = drawableHashMap.get(key(cell));
         if (drawable != null) {
@@ -140,14 +149,64 @@ public class QuickShareSelectorOverlayLayout extends View {
     }
 
     private final ArrayList<Long> dialogs = new ArrayList<>();
+    private final HashSet<Long> configuredDestinationIds = new HashSet<>();
     private final int currentAccount = UserConfig.selectedAccount;
+
+    private void addConfiguredDestinations(long selfUserId) {
+        String storedValue = NaConfig.INSTANCE.getQuickShareDestinationIds().String();
+        if (storedValue == null || storedValue.isEmpty()) {
+            return;
+        }
+        String prefix = selfUserId + ":";
+        for (String accountEntry : storedValue.split(";")) {
+            if (!accountEntry.startsWith(prefix)) {
+                continue;
+            }
+            String payload = accountEntry.substring(prefix.length());
+            for (String token : payload.split(",")) {
+                try {
+                    long dialogId = Long.parseLong(token.trim());
+                    if (dialogId != selfUserId && isQuickShareDestinationValid(dialogId)) {
+                        configuredDestinationIds.add(dialogId);
+                        dialogs.add(dialogId);
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed or stale IDs.
+                }
+            }
+            break;
+        }
+    }
+
+    private boolean isQuickShareDestinationValid(long dialogId) {
+        if (dialogId == UserConfig.getInstance(currentAccount).clientUserId) {
+            return true;
+        }
+        if (dialogId == 0 || DialogObject.isEncryptedDialog(dialogId)) {
+            return false;
+        }
+        MessagesController messagesController = MessagesController.getInstance(currentAccount);
+        if (DialogObject.isUserDialog(dialogId)) {
+            TLRPC.User user = messagesController.getUser(dialogId);
+            return user != null && !UserObject.isBot(user) && !UserObject.isDeleted(user) && !UserObject.isService(user.id);
+        }
+        TLRPC.Chat chat = messagesController.getChat(-dialogId);
+        return chat != null
+                && !chat.forum
+                && !ChatObject.isNotInChat(chat)
+                && !(chat.gigagroup && !ChatObject.hasAdminRights(chat))
+                && !(ChatObject.isChannel(chat) && !chat.creator
+                    && (chat.admin_rights == null || !chat.admin_rights.post_messages) && !chat.megagroup);
+    }
 
     private void fetchDialogs() {
         dialogs.clear();
+        configuredDestinationIds.clear();
 
         final UserConfig config = UserConfig.getInstance(currentAccount);
         long selfUserId = config.clientUserId;
         dialogs.add(selfUserId);
+        addConfiguredDestinations(selfUserId);
 
         if (config.suggestContacts) {
             final ArrayList<TLRPC.TL_topPeer> hints = MediaDataController.getInstance(currentAccount).hints;
@@ -212,14 +271,14 @@ public class QuickShareSelectorOverlayLayout extends View {
         return object.getChatId() + "_" + object.getId();
     }
 
-    private static ArrayList<Long> removeDuplicates(ArrayList<Long> list) {
+    private ArrayList<Long> removeDuplicates(ArrayList<Long> list) {
         HashSet<Long> seen = new HashSet<>();
         ArrayList<Long> result = new ArrayList<>();
+        long selfUserId = UserConfig.getInstance(currentAccount).clientUserId;
         for (Long item : list) {
-            if (seen.add(item)) {
-                if (DialogObject.isUserDialog(item)) {
-                    result.add(item);
-                }
+            if (item != null && seen.add(item) && isQuickShareDestinationValid(item)
+                    && (DialogObject.isUserDialog(item) || item == selfUserId || configuredDestinationIds.contains(item))) {
+                result.add(item);
             }
         }
         return result;

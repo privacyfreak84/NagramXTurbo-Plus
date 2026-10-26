@@ -90,11 +90,19 @@ class QuickShareAvatarCell implements ValueAnimator.AnimatorUpdateListener {
     private float bgX1, bgY;
 
     public void draw(Canvas c, float hardMinX, float hardMaxX, float softMinX, float softMaxX, float cx, float cy, float rad, float alpha, boolean withoutAvatar) {
+        drawImpl(c, hardMinX, hardMaxX, softMinX, softMaxX, cx, cy, rad, alpha, withoutAvatar, true);
+    }
+
+    public void drawWheel(Canvas c, float hardMinX, float hardMaxX, float softMinX, float softMaxX, float cx, float cy, float rad, float alpha, boolean withoutAvatar) {
+        drawImpl(c, hardMinX, hardMaxX, softMinX, softMaxX, cx, cy, rad, alpha, withoutAvatar, false);
+    }
+
+    private void drawImpl(Canvas c, float hardMinX, float hardMaxX, float softMinX, float softMaxX, float cx, float cy, float rad, float alpha, boolean withoutAvatar, boolean showLabel) {
         if (!withoutAvatar) {
             drawAvatarImpl(c, cx, cy, rad + dp(2) * selectedFactor, alpha);
         }
 
-        if (selectedFactor > 0f && textLayout != null) {
+        if (showLabel && selectedFactor > 0f && textLayout != null) {
             final float s = 0.85f + 0.15f * selectedFactor;
             c.save();
             c.scale(s, s, cx, cy);

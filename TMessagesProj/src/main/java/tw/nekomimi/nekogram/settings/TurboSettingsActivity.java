@@ -49,6 +49,12 @@ import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.ChatObject;
+import org.telegram.messenger.DialogObject;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.UserObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.Theme;
@@ -76,6 +82,7 @@ import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceWrapped;
 import org.telegram.ui.Components.chat.WallpaperBitmapProvider;
 import org.telegram.ui.Components.ActionButtonStyle;
 import org.telegram.ui.LaunchActivity;
+import org.telegram.ui.DialogsActivity;
 import org.telegram.ui.LauncherIconController;
 
 import java.io.File;
@@ -93,6 +100,7 @@ import tw.nekomimi.nekogram.config.cell.ConfigCellDivider;
 import tw.nekomimi.nekogram.config.cell.ConfigCellHeader;
 import tw.nekomimi.nekogram.config.cell.ConfigCellSelectBox;
 import tw.nekomimi.nekogram.config.cell.ConfigCellTextCheck;
+import tw.nekomimi.nekogram.config.cell.ConfigCellTextDetail;
 import tw.nekomimi.nekogram.config.cell.ConfigCellTextCheckIcon;
 import tw.nekomimi.nekogram.config.cell.ConfigCellTextInput;
 import tw.nekomimi.nekogram.utils.ShareUtil;
@@ -177,6 +185,21 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
 
     private final AbstractConfigCell headerForwarding = BuildVars.TURBO_BASE ? null : cellGroup.appendCell(new ConfigCellHeader(getString(R.string.ForwardingSettings)));
     private final AbstractConfigCell quickReactionLikeEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getQuickReactionLikeEnabled(), getString(R.string.QuickReactionLikeEnabledAbout)));
+    private final AbstractConfigCell quickReactionUpEmojiRow = cellGroup.appendCell(new ConfigCellTextInput(getString(R.string.QuickReactionUpEmoji), NaConfig.INSTANCE.getQuickReactionUpEmoji(), getString(R.string.QuickReactionEmojiHint), null, String::trim, (raw, normalized) -> normalized.isEmpty()));
+    private final AbstractConfigCell quickReactionHeartEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getQuickReactionHeartEnabled(), getString(R.string.QuickReactionHeartEnabledAbout)));
+    private final AbstractConfigCell quickReactionRightEmojiRow = cellGroup.appendCell(new ConfigCellTextInput(getString(R.string.QuickReactionRightEmoji), NaConfig.INSTANCE.getQuickReactionRightEmoji(), getString(R.string.QuickReactionEmojiHint), null, String::trim, (raw, normalized) -> normalized.isEmpty()));
+    private final AbstractConfigCell quickReactionLaughEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getQuickReactionLaughEnabled(), getString(R.string.QuickReactionLaughEnabledAbout)));
+    private final AbstractConfigCell quickReactionLeftEmojiRow = cellGroup.appendCell(new ConfigCellTextInput(getString(R.string.QuickReactionLeftEmoji), NaConfig.INSTANCE.getQuickReactionLeftEmoji(), getString(R.string.QuickReactionEmojiHint), null, String::trim, (raw, normalized) -> normalized.isEmpty()));
+    private final AbstractConfigCell quickReactionFireEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getQuickReactionFireEnabled(), getString(R.string.QuickReactionFireEnabledAbout)));
+    private final AbstractConfigCell quickReactionDownEmojiRow = cellGroup.appendCell(new ConfigCellTextInput(getString(R.string.QuickReactionDownEmoji), NaConfig.INSTANCE.getQuickReactionDownEmoji(), getString(R.string.QuickReactionEmojiHint), null, String::trim, (raw, normalized) -> normalized.isEmpty()));
+    private final AbstractConfigCell quickShareDestinationsRow = cellGroup.appendCell(new ConfigCellTextDetail(
+            NaConfig.INSTANCE.getQuickShareDestinationIds(),
+            (view, position) -> showQuickShareDestinationsDialog(),
+            getString(R.string.QuickShareDestinationHint),
+            false,
+            getString(R.string.QuickShareDestinations),
+            value -> quickShareDestinationSummary(value),
+            null, null, null));
     private final AbstractConfigCell forwardProtectedModeRow = BuildVars.TURBO_BASE ? null : cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getForwardProtectedMode(), new String[]{
             getString(R.string.ForwardProtectedModeAsk),
             getString(R.string.ForwardProtectedModeAlways),
@@ -262,6 +285,268 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
     private ListAdapter listAdapter;
     private InputBarPreviewCell inputBarPreviewCell;
     private SaveDeletedCategoriesCell saveDeletedCategoriesCell;
+
+    private static final int MAX_QUICK_SHARE_CUSTOM_DESTINATIONS = 4;
+
+    private ArrayList<Long> parseQuickShareDestinationIds(String storedValue) {
+        java.util.LinkedHashSet<Long> result = new java.util.LinkedHashSet<>();
+        if (storedValue == null || storedValue.isEmpty()) {
+            return new ArrayList<>(result);
+        }
+        long selfId = UserConfig.getInstance(UserConfig.selectedAccount).clientUserId;
+        String prefix = selfId + ":";
+        for (String accountEntry : storedValue.split(";")) {
+            if (!accountEntry.startsWith(prefix)) {
+                continue;
+            }
+            String payload = accountEntry.substring(prefix.length());
+            for (String token : payload.split(",")) {
+                try {
+                    long dialogId = Long.parseLong(token.trim());
+                    if (dialogId != 0 && dialogId != selfId && !DialogObject.isEncryptedDialog(dialogId)) {
+                        result.add(dialogId);
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed/stale preference entries instead of breaking settings.
+                }
+            }
+            break;
+        }
+        return new ArrayList<>(result);
+    }
+
+    private String quickShareDestinationSummary(String storedValue) {
+        int count = parseQuickShareDestinationIds(storedValue).size();
+        return count == 0
+                ? getString(R.string.QuickShareSavedMessagesOnly)
+                : LocaleController.formatString(R.string.QuickShareDestinationsSummary, count);
+    }
+
+    private void saveQuickShareDestinationIds(List<Long> ids) {
+        long selfId = UserConfig.getInstance(UserConfig.selectedAccount).clientUserId;
+        String prefix = selfId + ":";
+        String storedValue = NaConfig.INSTANCE.getQuickShareDestinationIds().String();
+        ArrayList<String> entries = new ArrayList<>();
+        if (storedValue != null && !storedValue.isEmpty()) {
+            for (String entry : storedValue.split(";")) {
+                if (!entry.isEmpty() && !entry.startsWith(prefix)) {
+                    entries.add(entry);
+                }
+            }
+        }
+
+        java.util.LinkedHashSet<Long> distinct = new java.util.LinkedHashSet<>();
+        for (Long id : ids) {
+            if (id != null && id != 0 && id != selfId && !DialogObject.isEncryptedDialog(id)) {
+                distinct.add(id);
+            }
+        }
+        if (!distinct.isEmpty()) {
+            StringBuilder payload = new StringBuilder(prefix);
+            for (Long id : distinct) {
+                if (payload.length() > prefix.length()) {
+                    payload.append(',');
+                }
+                payload.append(id);
+            }
+            entries.add(payload.toString());
+        }
+        StringBuilder serialized = new StringBuilder();
+        for (String entry : entries) {
+            if (serialized.length() > 0) {
+                serialized.append(';');
+            }
+            serialized.append(entry);
+        }
+        NaConfig.INSTANCE.getQuickShareDestinationIds().setConfigString(serialized.toString());
+
+        int row = cellGroup.rows.indexOf(quickShareDestinationsRow);
+        if (row >= 0 && cellGroup.getListAdapter() != null) {
+            cellGroup.getListAdapter().notifyItemChanged(row);
+        }
+    }
+
+    private String quickShareDestinationName(long dialogId) {
+        int account = UserConfig.selectedAccount;
+        if (dialogId == UserConfig.getInstance(account).clientUserId) {
+            return getString(R.string.QuickShareDestinationSavedMessages);
+        }
+        if (DialogObject.isEncryptedDialog(dialogId)) {
+            return LocaleController.formatString(R.string.QuickShareDestinationUnavailable, dialogId);
+        }
+        MessagesController messagesController = MessagesController.getInstance(account);
+        if (DialogObject.isUserDialog(dialogId)) {
+            TLRPC.User user = messagesController.getUser(dialogId);
+            if (user != null && !UserObject.isDeleted(user)) {
+                String name = UserObject.getUserName(user);
+                if (name != null && !name.trim().isEmpty()) {
+                    return name;
+                }
+            }
+        } else {
+            TLRPC.Chat chat = messagesController.getChat(-dialogId);
+            if (chat != null && chat.title != null && !chat.title.trim().isEmpty()) {
+                return chat.title;
+            }
+        }
+        return LocaleController.formatString(R.string.QuickShareDestinationUnavailable, dialogId);
+    }
+
+    private boolean isQuickShareDestinationEligible(long dialogId) {
+        int account = UserConfig.selectedAccount;
+        long selfId = UserConfig.getInstance(account).clientUserId;
+        if (dialogId == 0 || dialogId == selfId || DialogObject.isEncryptedDialog(dialogId)) {
+            return false;
+        }
+        MessagesController messagesController = MessagesController.getInstance(account);
+        if (DialogObject.isUserDialog(dialogId)) {
+            TLRPC.User user = messagesController.getUser(dialogId);
+            return user != null && !UserObject.isBot(user) && !UserObject.isDeleted(user) && !UserObject.isService(user.id);
+        }
+        TLRPC.Chat chat = messagesController.getChat(-dialogId);
+        return chat != null
+                && !chat.forum
+                && !ChatObject.isNotInChat(chat)
+                && !(chat.gigagroup && !ChatObject.hasAdminRights(chat))
+                && !(ChatObject.isChannel(chat) && !chat.creator
+                    && (chat.admin_rights == null || !chat.admin_rights.post_messages) && !chat.megagroup);
+    }
+
+    private void showQuickShareInfo(String message) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        showDialog(new AlertDialog.Builder(getParentActivity())
+                .setMessage(message)
+                .setPositiveButton(getString(R.string.OK), null)
+                .create());
+    }
+
+    private void showQuickShareDestinationsDialog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        ArrayList<Long> ids = parseQuickShareDestinationIds(NaConfig.INSTANCE.getQuickShareDestinationIds().String());
+        ArrayList<String> labels = new ArrayList<>();
+        labels.add(getString(R.string.QuickShareDestinationSavedMessages));
+        for (Long id : ids) {
+            labels.add(quickShareDestinationName(id));
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(getString(R.string.QuickShareDestinations));
+        builder.setItems(labels.toArray(new String[0]), (dialog, which) -> {
+            // Saved Messages is fixed and cannot be removed. Tap a configured row to remove it.
+            if (which > 0 && which - 1 < ids.size()) {
+                confirmRemoveQuickShareDestination(ids.get(which - 1));
+            }
+        });
+        builder.setPositiveButton(getString(R.string.QuickShareAddDestination),
+                (dialog, which) -> AndroidUtilities.runOnUIThread(this::selectQuickShareDestination));
+        builder.setNegativeButton(getString(R.string.Cancel), null);
+        showDialog(builder.create());
+    }
+
+    private void confirmRemoveQuickShareDestination(long dialogId) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        String name = quickShareDestinationName(dialogId);
+        showDialog(new AlertDialog.Builder(getParentActivity())
+                .setTitle(getString(R.string.QuickShareRemoveDestination))
+                .setMessage(LocaleController.formatString(R.string.QuickShareRemoveDestinationConfirm, name))
+                .setPositiveButton(getString(R.string.QuickShareRemoveDestinationAction), (dialog, which) -> {
+                    ArrayList<Long> ids = parseQuickShareDestinationIds(NaConfig.INSTANCE.getQuickShareDestinationIds().String());
+                    ids.remove(Long.valueOf(dialogId));
+                    saveQuickShareDestinationIds(ids);
+                    AndroidUtilities.runOnUIThread(this::showQuickShareDestinationsDialog);
+                })
+                .setNegativeButton(getString(R.string.Cancel), null)
+                .create());
+    }
+
+    private void selectQuickShareDestination() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        ArrayList<Long> ids = parseQuickShareDestinationIds(NaConfig.INSTANCE.getQuickShareDestinationIds().String());
+        if (ids.size() >= MAX_QUICK_SHARE_CUSTOM_DESTINATIONS) {
+            showQuickShareInfo(getString(R.string.QuickShareDestinationsLimit));
+            return;
+        }
+
+        Bundle args = new Bundle();
+        args.putBoolean("onlySelect", true);
+        args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
+        args.putBoolean("canSelectTopics", false);
+        // DialogsActivity enables multi-select for forward targets when selectAlertString is non-null.
+        // No selectAlertStringGroup is supplied, so this sentinel is not shown as a confirmation alert.
+        args.putString("selectAlertString", "quick_share_multi_select");
+        DialogsActivity picker = new DialogsActivity(args);
+        picker.setDelegate((selectedFragment, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
+            if (dids == null || dids.isEmpty()) {
+                return false;
+            }
+
+            long selfId = UserConfig.getInstance(UserConfig.selectedAccount).clientUserId;
+            ArrayList<Long> current = parseQuickShareDestinationIds(NaConfig.INSTANCE.getQuickShareDestinationIds().String());
+            java.util.LinkedHashSet<Long> updated = new java.util.LinkedHashSet<>(current);
+            int added = 0;
+            boolean skippedUnavailable = false;
+            boolean skippedDuplicate = false;
+            boolean limitReached = false;
+
+            // The forward picker can now return several selected dialogs. Keep the existing
+            // wheel limit (four configured destinations plus Saved Messages), adding all
+            // valid new selections that fit in one pass.
+            for (MessagesStorage.TopicKey selected : dids) {
+                if (selected == null || selected.topicId != 0) {
+                    skippedUnavailable = true;
+                    continue;
+                }
+                long dialogId = selected.dialogId;
+                if (dialogId == selfId) {
+                    // Saved Messages is automatically pinned in the first wheel slot.
+                    continue;
+                }
+                if (!isQuickShareDestinationEligible(dialogId)) {
+                    skippedUnavailable = true;
+                    continue;
+                }
+                if (updated.contains(dialogId)) {
+                    skippedDuplicate = true;
+                    continue;
+                }
+                if (updated.size() >= MAX_QUICK_SHARE_CUSTOM_DESTINATIONS) {
+                    limitReached = true;
+                    continue;
+                }
+                updated.add(dialogId);
+                added++;
+            }
+
+            if (added == 0) {
+                if (limitReached) {
+                    showQuickShareInfo(getString(R.string.QuickShareDestinationsLimit));
+                } else if (skippedUnavailable) {
+                    showQuickShareInfo(getString(R.string.QuickShareDestinationNotAvailable));
+                } else if (skippedDuplicate) {
+                    showQuickShareInfo(getString(R.string.QuickShareDestinationAlreadyAdded));
+                } else {
+                    showQuickShareInfo(getString(R.string.QuickShareSavedMessagesAlreadyIncluded));
+                }
+                return false;
+            }
+
+            saveQuickShareDestinationIds(new ArrayList<>(updated));
+            selectedFragment.finishFragment();
+            if (limitReached) {
+                AndroidUtilities.runOnUIThread(() -> showQuickShareInfo(getString(R.string.QuickShareDestinationsLimit)));
+            }
+            return true;
+        });
+        presentFragment(picker);
+    }
 
     public TurboSettingsActivity() {
         if (!NaConfig.INSTANCE.getIosInputAppearance().Bool()) {

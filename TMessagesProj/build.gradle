@@ -10,6 +10,13 @@ plugins {
     id 'idea'
 }
 
+
+// Local development only: permit builds without Firebase configuration.
+googleServices {
+    missingGoogleServicesStrategy =
+        com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy.WARN
+}
+
 idea {
     module {
         excludeDirs += [
@@ -257,7 +264,7 @@ android {
                 proguardFiles 'proguard-turbo-base.pro'
             }
             matchingFallbacks = ['release', 'staging', 'debug']
-            signingConfig = signingConfigs.release
+            signingConfig = signingConfigs.debug
         }
 
         release {

@@ -1,0 +1,68 @@
+name: Check upstream Turbo updates
+
+on:
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-turbo-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the fork's default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Merge upstream default branch and open a PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FORK_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          upstream_repo="temporaryna/NagramXTurbo"
+          upstream_branch="$(gh api "repos/${upstream_repo}" --jq '.default_branch')"
+          echo "Upstream default branch: ${upstream_branch}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/${upstream_repo}.git"
+          git fetch upstream "${upstream_branch}"
+          git fetch origin "${FORK_DEFAULT_BRANCH}"
+          git switch --force-create automation/upstream-sync "origin/${FORK_DEFAULT_BRANCH}"
+          before_merge="$(git rev-parse HEAD)"
+          if ! git merge --no-edit "upstream/${upstream_branch}"; then
+            echo "::error title=Upstream sync has merge conflicts::Resolve conflicts between upstream/${upstream_branch} and ${FORK_DEFAULT_BRANCH} locally, then push the result. No user's branch was force-updated."
+            git diff --name-only --diff-filter=U || true
+            exit 1
+          fi
+          after_merge="$(git rev-parse HEAD)"
+          if [[ "$after_merge" == "$before_merge" ]]; then
+            echo "Already up to date with ${upstream_repo}:${upstream_branch}."
+            exit 0
+          fi
+          # The bot owns this branch; force-with-lease only updates this bot branch,
+          # never the user's personal/default branch.
+          git push --force-with-lease origin HEAD:refs/heads/automation/upstream-sync
+          existing_pr="$(gh pr list --repo "$GH_REPO" --state open --head "${GITHUB_REPOSITORY_OWNER}:automation/upstream-sync" --base "$FORK_DEFAULT_BRANCH" --json number --jq '.[0].number // empty')"
+          if [[ -z "$existing_pr" ]]; then
+            gh pr create --repo "$GH_REPO" \
+              --base "$FORK_DEFAULT_BRANCH" \
+              --head automation/upstream-sync \
+              --title "Sync upstream Turbo: ${upstream_branch}" \
+              --body $'This pull request merges the latest upstream `temporaryna/NagramXTurbo` default branch into this personal fork.\n\nReview the diff and build/test before merging. If the merge cannot be performed automatically, resolve conflicts locally and push the result.'
+          else
+            gh pr edit "$existing_pr" --repo "$GH_REPO" \
+              --title "Sync upstream Turbo: ${upstream_branch}" \
+              --body $'Updated automatic upstream-sync pull request. Review the diff and build/test before merging.'
+          fi

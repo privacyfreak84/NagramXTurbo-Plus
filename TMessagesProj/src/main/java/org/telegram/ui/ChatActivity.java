@@ -41793,7 +41793,8 @@ public class ChatActivity extends BaseFragment implements
             if (getParentActivity() == null || messageObject == null || messageObject.messageOwner == null || TextUtils.isEmpty(emoji)) {
                 return;
             }
-            if (!isQuickReactionAvailable(messageObject, emoji)) {
+            String canonicalEmoji = resolveQuickReactionEmoji(emoji);
+            if (canonicalEmoji == null || !isQuickReactionAvailable(messageObject, canonicalEmoji)) {
                 return;
             }
 
@@ -41809,7 +41810,24 @@ public class ChatActivity extends BaseFragment implements
                 reactionY += sourceLocation[1] - targetLocation[1];
             }
             selectReaction(reactionCell != null ? reactionCell : cell, messageObject, null, null, reactionX, reactionY,
-                    ReactionsLayoutInBubble.VisibleReaction.fromEmojicon(emoji), false, false, true, false);
+                    ReactionsLayoutInBubble.VisibleReaction.fromEmojicon(canonicalEmoji), false, false, true, false);
+        }
+
+        private String resolveQuickReactionEmoji(String emoji) {
+            if (TextUtils.isEmpty(emoji)) {
+                return null;
+            }
+            String normalizedEmoji = normalizeQuickReactionEmojiString(emoji);
+            for (TLRPC.TL_availableReaction reaction : MediaDataController.getInstance(currentAccount).getEnabledReactionsList()) {
+                if (normalizedEmoji.equals(normalizeQuickReactionEmojiString(reaction.reaction))) {
+                    return reaction.reaction;
+                }
+            }
+            return null;
+        }
+
+        private String normalizeQuickReactionEmojiString(String emoji) {
+            return emoji == null ? "" : emoji.trim().replace("\uFE0F", "");
         }
 
         private boolean isQuickReactionAvailable(MessageObject messageObject, String emoji) {
@@ -41835,7 +41853,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                     if (allowed instanceof TLRPC.TL_chatReactionsSome) {
                         for (TLRPC.Reaction candidate : ((TLRPC.TL_chatReactionsSome) allowed).reactions) {
-                            if (candidate instanceof TLRPC.TL_reactionEmoji && emoji.equals(((TLRPC.TL_reactionEmoji) candidate).emoticon)) {
+                            if (candidate instanceof TLRPC.TL_reactionEmoji && normalizeQuickReactionEmojiString(emoji).equals(normalizeQuickReactionEmojiString(((TLRPC.TL_reactionEmoji) candidate).emoticon))) {
                                 return true;
                             }
                         }
@@ -41874,7 +41892,26 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
 
+            // Include the release point, not just the last MOVE event, when
+            // deciding which wheel option was intended.
+            quickShareSelectorOverlay.onTouchMoveEvent(cell, x, y);
+            String reactionEmoji = quickShareSelectorOverlay.getSelectedReactionEmoji(cell);
+            if (reactionEmoji != null && !reactionEmoji.isEmpty()) {
+                MessageObject messageObject = quickShareSelectorOverlay.getSelectedMessageObject(cell);
+                quickShareSelectorOverlay.close(cell, null);
+                didQuickReact(cell, messageObject, reactionEmoji, x, y);
+                return;
+            }
+
             quickShareSelectorOverlay.close(cell, sendMessageFromQuickShare(cell));
+        }
+
+        @Override
+        public void didQuickShareCancel(ChatMessageCell cell, float x, float y) {
+            if (quickShareSelectorOverlay != null) {
+                // A cancelled gesture must dismiss the selector without sending anything.
+                quickShareSelectorOverlay.close(cell, null);
+            }
         }
 
         private Bulletin sendMessageFromQuickShare(ChatMessageCell cell) {
@@ -41884,15 +41921,12 @@ public class ChatActivity extends BaseFragment implements
 
             final MessageObject messageObject = quickShareSelectorOverlay.getSelectedMessageObject(cell);
             final long did = quickShareSelectorOverlay.getSelectedDialogId(cell);
-
             if (messageObject == null || did == 0) {
                 return null;
             }
-
             if (AlertsCreator.checkSlowMode(getContext(), currentAccount, did, false)) {
                 return null;
             }
-
 
             ArrayList<MessageObject> arrayList = null;
             if (messageObject.getGroupId() != 0) {
@@ -41906,25 +41940,22 @@ public class ChatActivity extends BaseFragment implements
                 arrayList.add(messageObject);
             }
 
-            final boolean isSavedMessages = did == UserConfig.getInstance(UserConfig.selectedAccount).clientUserId;
-            final ArrayList<MessageObject> finalArrayList = arrayList;
-            Runnable delayedRunnalble = () -> {
-                int result = SendMessagesHelper.getInstance(currentAccount).sendMessage(finalArrayList, did, false, false, !NaConfig.INSTANCE.getSilentMessageByDefault().Bool(), 0, 0, null, -1, 0, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-                AlertsCreator.showSendMediaAlert(result, ChatActivity.this, null);
-            };
-
-            if (isSavedMessages) {
-                delayedRunnalble.run();
-                delayedRunnalble = null;
-            }
+            // Send as soon as the user releases on a destination. The standard
+            // SendMessagesHelper path performs the local dialog/message updates
+            // and posts dialogsNeedReload, so the target can surface in Chats
+            // without waiting for the confirmation bulletin to detach.
+            final int result = SendMessagesHelper.getInstance(currentAccount).sendMessage(
+                    arrayList, did, false, false,
+                    !NaConfig.INSTANCE.getSilentMessageByDefault().Bool(),
+                    0, 0, null, -1, 0,
+                    getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+            AlertsCreator.showSendMediaAlert(result, ChatActivity.this, null);
 
             final Bulletin bulletin = BulletinFactory.createForwardedBulletin(getContext(),
                     ChatActivity.this, null, 1, did, 1,
                     getThemedColor(Theme.key_undo_background),
                     getThemedColor(Theme.key_undo_infoColor),
-                    Bulletin.DURATION_PROLONG, null, delayedRunnalble
-            );
-
+                    Bulletin.DURATION_PROLONG);
             return bulletin.allowBlur().show(bulletin.getLayout() instanceof Bulletin.LottieLayoutWithReactions);
         }
 

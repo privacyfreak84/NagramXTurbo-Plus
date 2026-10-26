@@ -278,7 +278,12 @@ public class ApplicationLoader extends Application {
         NaConfig.init();
         LauncherIconController.tryFixLauncherIconIfNeeded();
         SharedPrefsHelper.init(applicationContext);
-        FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(AndroidUtil.shouldEnableCrashlytics());
+        try {
+            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(AndroidUtil.shouldEnableCrashlytics());
+        } catch (IllegalStateException e) {
+            // Local development builds may not have google-services.json configured.
+            FileLog.e(e);
+        }
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
             MessagesController.getInstance(a);

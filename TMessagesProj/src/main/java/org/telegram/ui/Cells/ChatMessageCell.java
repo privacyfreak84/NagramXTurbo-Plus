@@ -692,6 +692,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         default void didQuickShareEnd(ChatMessageCell cell, float x, float y) {
         }
 
+        default void didQuickShareCancel(ChatMessageCell cell, float x, float y) {
+        }
+
         default void didPressOther(ChatMessageCell cell, float otherX, float otherY) {
         }
 
@@ -1698,8 +1701,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private boolean sideButtonPressed;
     private boolean quickReactionGestureTracking;
     private boolean quickReactionGestureTriggered;
+    private String quickReactionGestureEmoji;
     private float quickReactionGestureStartX, quickReactionGestureStartY;
     private MessageObject quickReactionMessageObject;
+    private Runnable quickShareLongPressRunnable;
+    private static final long QUICK_SHARE_HOLD_DELAY_MS = 260L;
     private boolean drawSummarizeButton;
     private boolean summarizeButtonPressed;
     private int pressedSideButton;
@@ -2205,6 +2211,116 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return new int[]{start, end};
     }
 
+    private boolean isAnyQuickReactionGestureEnabled() {
+        return NaConfig.INSTANCE.getQuickReactionLikeEnabled().Bool()
+                || NaConfig.INSTANCE.getQuickReactionHeartEnabled().Bool()
+                || NaConfig.INSTANCE.getQuickReactionLaughEnabled().Bool()
+                || NaConfig.INSTANCE.getQuickReactionFireEnabled().Bool();
+    }
+
+    private boolean isQuickReactionFallbackTarget(float x, float y) {
+        if (currentMessageObject == null || currentMessageObject.type == MessageObject.TYPE_EMOJIS
+                || !isAnyQuickReactionGestureEnabled() || sideButtonVisible && drawSideButton == 1) {
+            return false;
+        }
+
+        // Inside the lower-right corner of this message/tile, not outside the child's bounds.
+        float right = backgroundDrawableLeft + backgroundDrawableRight;
+        float bottom = layoutHeight;
+        if (transitionParams != null) {
+            bottom += transitionParams.deltaBottom;
+        }
+        if (currentMessagesGroup != null && currentPosition != null) {
+            right += currentMessagesGroup.transitionParams.offsetRight - animationOffsetX;
+            bottom += currentMessagesGroup.transitionParams.offsetBottom;
+            if (currentMessagesGroup.transitionParams.backgroundChangeBounds) {
+                bottom -= getTranslationY();
+            }
+        }
+        if (currentMessageObject.shouldDrawReactions() && !reactionsLayoutInBubble.isSmall) {
+            float changeProgress = transitionParams != null ? transitionParams.animateChangeProgress : 1f;
+            if (isRoundVideo) {
+                bottom -= reactionsLayoutInBubble.getCurrentTotalHeight(changeProgress) * (1f - getVideoTranscriptionProgress());
+            } else if (reactionsLayoutInBubble.drawServiceShaderBackground > 0) {
+                bottom -= reactionsLayoutInBubble.getCurrentTotalHeight(changeProgress);
+            }
+        }
+        return x >= right - dp(48) && x <= right + dp(4)
+                && y >= bottom - dp(48) && y <= bottom + dp(4);
+    }
+
+    public String[] getQuickReactionWheelEmojis() {
+        final String[] emojis = new String[4];
+        if (NaConfig.INSTANCE.getQuickReactionLikeEnabled().Bool()) {
+            emojis[0] = NaConfig.INSTANCE.getQuickReactionUpEmoji().String();
+        }
+        if (NaConfig.INSTANCE.getQuickReactionHeartEnabled().Bool()) {
+            emojis[1] = NaConfig.INSTANCE.getQuickReactionRightEmoji().String();
+        }
+        if (NaConfig.INSTANCE.getQuickReactionFireEnabled().Bool()) {
+            emojis[2] = NaConfig.INSTANCE.getQuickReactionDownEmoji().String();
+        }
+        if (NaConfig.INSTANCE.getQuickReactionLaughEnabled().Bool()) {
+            emojis[3] = NaConfig.INSTANCE.getQuickReactionLeftEmoji().String();
+        }
+        for (int i = 0; i < emojis.length; i++) {
+            if (emojis[i] != null) {
+                emojis[i] = emojis[i].trim();
+                if (emojis[i].isEmpty()) {
+                    emojis[i] = null;
+                }
+            }
+        }
+        return emojis;
+    }
+
+    @Override
+    protected void startCheckLongPress() {
+        if (!isQuickShareHandleLongPressCandidate()) {
+            super.startCheckLongPress();
+            return;
+        }
+
+        if (quickShareLongPressRunnable == null) {
+            quickShareLongPressRunnable = () -> {
+                if (!isQuickShareHandleLongPressCandidate()) {
+                    return;
+                }
+                cancelCheckLongPress();
+                final boolean handled = onLongPress();
+                if (handled) {
+                    try {
+                        if (!NekoConfig.disableVibration.Bool()) {
+                            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                        }
+                    } catch (Exception ignore) {
+                    }
+                    MotionEvent cancelEvent = MotionEvent.obtain(0, 0, MotionEvent.ACTION_CANCEL, 0, 0, 0);
+                    onTouchEvent(cancelEvent);
+                    cancelEvent.recycle();
+                }
+            };
+        }
+        removeCallbacks(quickShareLongPressRunnable);
+        postDelayed(quickShareLongPressRunnable, QUICK_SHARE_HOLD_DELAY_MS);
+    }
+
+    @Override
+    protected void cancelCheckLongPress() {
+        if (quickShareLongPressRunnable != null) {
+            removeCallbacks(quickShareLongPressRunnable);
+        }
+        super.cancelCheckLongPress();
+    }
+
+    private boolean isQuickShareHandleLongPressCandidate() {
+        return sideButtonPressed
+                && pressedSideButton != SIDE_BUTTON_SPONSORED_CLOSE
+                && pressedSideButton != SIDE_BUTTON_SPONSORED_MORE
+                && pressedSideButton != 3
+                && pressedSideButton != 2;
+    }
+
     private boolean checkQuickReactionGesture(MotionEvent event) {
         if (!quickReactionGestureTracking) {
             return false;
@@ -2220,9 +2336,27 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             final float dy = getEventY(event) - quickReactionGestureStartY;
             final float threshold = dp(32);
 
-            // Upward flick from the dedicated message share handle applies Like.
-            if (dy <= -threshold && Math.abs(dy) > Math.abs(dx) * 1.25f) {
+            String reactionEmoji = null;
+            if (Math.abs(dy) > Math.abs(dx) * 1.25f) {
+                if (dy <= -threshold && NaConfig.INSTANCE.getQuickReactionLikeEnabled().Bool()) {
+                    reactionEmoji = NaConfig.INSTANCE.getQuickReactionUpEmoji().String().trim();
+                } else if (dy >= threshold && NaConfig.INSTANCE.getQuickReactionFireEnabled().Bool()) {
+                    reactionEmoji = NaConfig.INSTANCE.getQuickReactionDownEmoji().String().trim();
+                }
+            } else if (Math.abs(dx) > Math.abs(dy) * 1.25f) {
+                if (dx >= threshold && NaConfig.INSTANCE.getQuickReactionHeartEnabled().Bool()) {
+                    reactionEmoji = NaConfig.INSTANCE.getQuickReactionRightEmoji().String().trim();
+                } else if (dx <= -threshold && NaConfig.INSTANCE.getQuickReactionLaughEnabled().Bool()) {
+                    reactionEmoji = NaConfig.INSTANCE.getQuickReactionLeftEmoji().String().trim();
+                }
+            }
+
+            if (reactionEmoji != null && reactionEmoji.isEmpty()) {
+                reactionEmoji = null;
+            }
+            if (reactionEmoji != null) {
                 quickReactionGestureTriggered = true;
+                quickReactionGestureEmoji = reactionEmoji;
                 sideButtonPressed = false;
                 pressedSideButton = 0;
                 cancelCheckLongPress();
@@ -2237,6 +2371,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             // to the normal list gesture (including vertical scrolling).
             if (Math.abs(dx) >= threshold || Math.abs(dy) >= threshold) {
                 quickReactionGestureTracking = false;
+                quickReactionGestureEmoji = null;
                 quickReactionMessageObject = null;
                 sideButtonPressed = false;
                 pressedSideButton = 0;
@@ -2253,14 +2388,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
         if (action == MotionEvent.ACTION_UP) {
             final MessageObject messageObject = quickReactionGestureTriggered ? quickReactionMessageObject : null;
+            final String reactionEmoji = quickReactionGestureTriggered ? quickReactionGestureEmoji : null;
             quickReactionGestureTracking = false;
             quickReactionGestureTriggered = false;
+            quickReactionGestureEmoji = null;
             quickReactionMessageObject = null;
             if (getParent() != null) {
                 getParent().requestDisallowInterceptTouchEvent(false);
             }
-            if (messageObject != null && delegate != null && delegate.canPerformActions()) {
-                delegate.didQuickReact(this, messageObject, "👍", getEventX(event), getEventY(event));
+            if (messageObject != null && reactionEmoji != null && delegate != null && delegate.canPerformActions()) {
+                delegate.didQuickReact(this, messageObject, reactionEmoji, getEventX(event), getEventY(event));
                 return true;
             }
             return false;
@@ -2269,6 +2406,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_POINTER_DOWN || action == MotionEvent.ACTION_POINTER_UP) {
             quickReactionGestureTracking = false;
             quickReactionGestureTriggered = false;
+            quickReactionGestureEmoji = null;
             quickReactionMessageObject = null;
             sideButtonPressed = false;
             pressedSideButton = 0;
@@ -2285,11 +2423,20 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             return false;
         }
 
-        final int action = event.getAction();
-        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+        final int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_UP) {
             inQuickShareMode = false;
             if (delegate != null) {
                 delegate.didQuickShareEnd(this, getEventX(event), getEventY(event));
+            }
+
+            return true;
+        } else if (action == MotionEvent.ACTION_CANCEL
+                || action == MotionEvent.ACTION_POINTER_DOWN
+                || action == MotionEvent.ACTION_POINTER_UP) {
+            inQuickShareMode = false;
+            if (delegate != null) {
+                delegate.didQuickShareCancel(this, getEventX(event), getEventY(event));
             }
 
             return true;
@@ -5098,6 +5245,30 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         lastTouchY = getEventY(event);
         backgroundDrawable.setTouchCoords(lastTouchX, lastTouchY);
 
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN
+                && !quickReactionGestureTracking
+                && isQuickReactionFallbackTarget(lastTouchX, lastTouchY)) {
+            quickReactionMessageObject = getPrimaryMessageObject();
+            quickReactionGestureTracking = quickReactionMessageObject != null;
+            quickReactionGestureTriggered = false;
+            quickReactionGestureEmoji = null;
+            quickReactionGestureStartX = lastTouchX;
+            quickReactionGestureStartY = lastTouchY;
+            if (quickReactionGestureTracking && getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
+        }
+
+        // Once tracking starts, give it first refusal before text/media controls can consume MOVE.
+        if (quickReactionGestureTracking && checkQuickReactionGesture(event)) {
+            return true;
+        }
+
+        // While quick-share is active, it owns the touch stream, including cancellation.
+        if (inQuickShareMode && checkQuickShareMotionEvent(event)) {
+            return true;
+        }
+
         boolean result = checkSpoilersMotionEvent(event, 0);
 
         if (!result) {
@@ -5331,12 +5502,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                                 pressedSideButton = drawSideButton;
                             }
                             sideButtonPressed = true;
-                            if (drawSideButton == 1 && NaConfig.INSTANCE.getQuickReactionLikeEnabled().Bool()
+                            if (drawSideButton == 1 && (NaConfig.INSTANCE.getQuickReactionLikeEnabled().Bool()
+                                    || NaConfig.INSTANCE.getQuickReactionHeartEnabled().Bool()
+                                    || NaConfig.INSTANCE.getQuickReactionLaughEnabled().Bool()
+                                    || NaConfig.INSTANCE.getQuickReactionFireEnabled().Bool())
                                     && x >= sideStartX - dp(6) && x <= sideStartX + dp(38)
                                     && y >= sideStartY - dp(6) && y <= sideStartY + dp(38)) {
                                 quickReactionMessageObject = getPrimaryMessageObject();
                                 quickReactionGestureTracking = quickReactionMessageObject != null;
                                 quickReactionGestureTriggered = false;
+                                quickReactionGestureEmoji = null;
                                 quickReactionGestureStartX = x;
                                 quickReactionGestureStartY = y;
                                 if (quickReactionGestureTracking && getParent() != null) {
@@ -12591,6 +12766,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 ) {
                     quickReactionGestureTracking = false;
                     quickReactionGestureTriggered = false;
+                    quickReactionGestureEmoji = null;
                     quickReactionMessageObject = null;
                     delegate.didQuickShareStart(this, lastTouchX, lastTouchY);
                     sideButtonPressed = false;

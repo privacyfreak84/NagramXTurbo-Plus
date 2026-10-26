@@ -158,6 +158,34 @@ object NaConfig {
             ConfigItem.configTypeBool,
             false
         )
+    val quickReactionHeartEnabled =
+        addConfig(
+            "QuickReactionHeartEnabled",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val quickReactionLaughEnabled =
+        addConfig(
+            "QuickReactionLaughEnabled",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val quickReactionFireEnabled =
+        addConfig(
+            "QuickReactionFireEnabled",
+            ConfigItem.configTypeBool,
+            false
+        )
+    val quickReactionUpEmoji =
+        addConfig("QuickReactionUpEmoji", ConfigItem.configTypeString, "👍")
+    val quickReactionRightEmoji =
+        addConfig("QuickReactionRightEmoji", ConfigItem.configTypeString, "❤")
+    val quickReactionLeftEmoji =
+        addConfig("QuickReactionLeftEmoji", ConfigItem.configTypeString, "😂")
+    val quickReactionDownEmoji =
+        addConfig("QuickReactionDownEmoji", ConfigItem.configTypeString, "🔥")
+    val quickShareDestinationIds =
+        addConfig("QuickShareDestinationIds", ConfigItem.configTypeString, "")
     val showNoQuoteForward =
         addConfig(
             "NoQuoteForward",

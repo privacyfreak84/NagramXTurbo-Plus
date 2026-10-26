@@ -22102,7 +22102,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         if (videoPlayer != null && scale <= 1.35f) {
             long current = videoPlayer.getCurrentPosition();
             long total = videoPlayer.getDuration();
-            if (current == C.TIME_UNSET || total < 8 * 1000) {
+            // Seeking is useful even for very short clips. Only reject invalid player times.
+            if (current == C.TIME_UNSET || current < 0 || total == C.TIME_UNSET || total <= 0) {
                 return;
             }
             float x = longPressX;
