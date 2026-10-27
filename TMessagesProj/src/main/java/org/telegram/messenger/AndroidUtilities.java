@@ -2873,20 +2873,9 @@ public class AndroidUtilities {
                 return String.format(Locale.US, "https://static-maps.yandex.ru/1.x/?ll=%.6f,%.6f&z=%d&size=%d,%d&l=map&scale=%d&lang=%s", lon, lat, zoom, width * scale, height * scale, scale, lang);
             }
         } else {
-            String k = "";
-            if (!TextUtils.isEmpty(k)) {
-                if (marker) {
-                    return String.format(Locale.US, "https://maps.googleapis.com/maps/api/staticmap?center=%.6f,%.6f&zoom=%d&size=%dx%d&maptype=roadmap&scale=%d&markers=color:red%%7Csize:mid%%7C%.6f,%.6f&sensor=false&key=%s", lat, lon, zoom, width, height, scale, lat, lon, k);
-                } else {
-                    return String.format(Locale.US, "https://maps.googleapis.com/maps/api/staticmap?center=%.6f,%.6f&zoom=%d&size=%dx%d&maptype=roadmap&scale=%d&key=%s", lat, lon, zoom, width, height, scale, k);
-                }
-            } else {
-                if (marker) {
-                    return String.format(Locale.US, "https://maps.googleapis.com/maps/api/staticmap?center=%.6f,%.6f&zoom=%d&size=%dx%d&maptype=roadmap&scale=%d&markers=color:red%%7Csize:mid%%7C%.6f,%.6f&sensor=false", lat, lon, zoom, width, height, scale, lat, lon);
-                } else {
-                    return String.format(Locale.US, "https://maps.googleapis.com/maps/api/staticmap?center=%.6f,%.6f&zoom=%d&size=%dx%d&maptype=roadmap&scale=%d", lat, lon, zoom, width, height, scale);
-                }
-            }
+            // Google Static Maps removed. Fallback for non-Telegram previews uses the OpenStreetMap community static map service.
+            String markerParam = marker ? String.format(Locale.US, "&markers=%.6f,%.6f,red-pushpin", lat, lon) : "";
+            return String.format(Locale.US, "https://staticmap.openstreetmap.de/staticmap.php?center=%.6f,%.6f&zoom=%d&size=%dx%d&maptype=mapnik%s", lat, lon, zoom, width * scale, height * scale, markerParam);
         }
     }
 
