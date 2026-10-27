@@ -1,0 +1,35 @@
+name: Release APK from run
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+      tag:
+        required: true
+      sha:
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n Staging -D out
+          find out -type f
+          cat > notes.md <<'NOTES'
+          De-Googled build of NagramXTurbo-Plus.
+
+          Removed: Firebase/Crashlytics, Google Maps and fused location (OSMDroid + Android location), Firebase push (UnifiedPush is the default; no distributor means no push), Cast/Wear, Vision/ML Kit, reCAPTCHA (fails closed), Google/Gemini translation presets.
+
+          Built by CI from commit 8a7382952 with no Google services config. Not feature-tested by the build. Known leftover: location-message map thumbnails still default to the Google Static Maps URL.
+          NOTES
+          APKS=$(find out -name '*.apk')
+          gh release create "$TAG" $APKS -R "$GITHUB_REPOSITORY" --target "$SHA" --title "De-Googled build $TAG" --notes-file notes.md
