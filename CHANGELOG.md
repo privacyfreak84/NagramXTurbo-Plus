@@ -4,6 +4,14 @@ Differences between Nagram X Turbo and [Nagram X](https://github.com/risin42/Nag
 
 ## Upstream
 
+Synced with Telegram 13.1.1. User-visible from upstream since 13.0.3:
+- Private chats with restricted sharing: Copy is now hidden in the text selection menu
+- Protected chats: photos pasted inside text messages now respect content restrictions
+- Bot forums: topics are created reliably when a bot posts to a new topic
+- Sharing: sending multiple files from the system picker or other apps works again and groups them into one album
+- Wallet: gift cards have a new 2D design
+- QR codes: redesigned sharing screen
+
 Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Voice messages: optional new recorder with noise suppression (RNNoise) — toggle in Settings
 - Bot keyboards: the system Back button no longer gets stuck when a bot keyboard stays open
@@ -105,6 +113,7 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Builds for `arm64-v8a` (64-bit) and `armeabi-v7a` (32-bit); in-app update auto-picks the matching APK by device arch
 
 ## Fixes
+- Text selection Copy works again after the 13.1.1 update — the item was there but did nothing; restricted chats now hide Copy in the base build only
 - Turbo → Network now holds both speed settings together, download and upload, with clear names; the upload boost previously hid in the experimental Neko settings under a misleading label
 - Bold text in messages looks properly bold again on devices where the system font has no separate medium weight (common on Chinese ROMs), matching Nagram X; custom fonts without a bold variant now get a synthetic bold too
 - Photo thumbnails no longer stay blank forever after fast scrolling through media: a download cancelled mid-scroll is no longer mistaken for a permanent failure
@@ -149,7 +158,10 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - View-deleted: photos can be saved to the gallery again — a photo now downloads properly, and if the full size is unavailable the best available one is saved (down to the preview) instead of an error
 - Uploading videos and GIFs on mobile data no longer hangs forever when the connection silently drops: a frozen upload restarts itself, and after a few failed tries shows an error you can retry
 - Cancelling a video or GIF that is still converting or uploading no longer marks the message with a red error
+- Sending a video shows its processing progress — "Processing video… 74%" in the chat and in the upload notification — instead of a size counter that looks stuck
+- A video upload no longer hangs forever when the video itself stops converting: after 90 seconds without progress the message shows an honest error you can retry, and the stuck conversion is cancelled
 - Saving several deleted media to the gallery in a row no longer slows down with each item: a save now gives its current download time to recover instead of piling on new requests
 - Removed the "Download Speed Boost" experimental setting — it had no effect after the 13.0.2 update and only made downloads hit server rate limits sooner
 - Fixed chats with old last messages staying hidden from the chat list until you scrolled it all the way to the bottom — the list now finishes loading by itself
 - Chat list stays reliable on flaky connections: the app no longer floods the server during the chat list sync (which could make it reset the local cache), and after any reset the list picks loading back up by itself instead of silently stopping
+- Video calls on tablets: the person you call no longer sees your video rotated sideways when you hold the tablet in landscape — outgoing video now follows the device orientation, also when screen rotation is locked

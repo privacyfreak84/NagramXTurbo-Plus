@@ -86,6 +86,9 @@ public class FileUploadOperation {
     private SparseArray<UploadCachedResult> cachedResults = new SparseArray<>();
     private boolean[] recalculatedEstimatedSize = {false, false};
     protected volatile long lastProgressUpdateTime;
+    protected volatile long lastDataAvailableTime;
+    private boolean streamingConversion;
+    private int chunkLogCounter;
 
     public volatile boolean caughtPremiumFloodWait;
 
@@ -102,6 +105,7 @@ public class FileUploadOperation {
         estimatedSize = estimated;
         currentType = type;
         uploadFirstPartLater = estimated != 0 && !isEncrypted;
+        streamingConversion = estimated != 0;
     }
 
     public long getTotalFileSize() {
@@ -118,6 +122,7 @@ public class FileUploadOperation {
         }
         state = 1;
         lastProgressUpdateTime = System.currentTimeMillis();
+        lastDataAvailableTime = lastProgressUpdateTime;
         AndroidUtilities.runOnUIThread(uploadStallCheck, UPLOAD_STALL_DETECT_MS);
         AutoDeleteMediaTask.lockFile(uploadingFilePath);
         Utilities.stageQueue.postRunnable(() -> {
@@ -210,6 +215,18 @@ public class FileUploadOperation {
 
     protected void checkNewDataAvailable(final long newAvailableSize, final long finalSize, final Float progress) {
         Utilities.stageQueue.postRunnable(() -> {
+            if (state != 1) {
+                return;
+            }
+            lastDataAvailableTime = System.currentTimeMillis();
+            if (streamingConversion && finalSize != 0) {
+                streamingConversion = false;
+                if (BuildVars.LOGS_ENABLED) {
+                    FileLog.d("debug_uploading: conversion finished " + uploadingFilePath + " finalSize=" + finalSize + " available=" + newAvailableSize);
+                }
+            } else if (streamingConversion && BuildVars.LOGS_ENABLED && chunkLogCounter++ % 8 == 0) {
+                FileLog.d("debug_uploading: chunk " + uploadingFilePath + " available=" + newAvailableSize + " estimated=" + estimatedSize);
+            }
             if (progress != null && estimatedSize != 0 && finalSize == 0) {
                 boolean needRecalculation = false;
                 if (progress > 0.75f && !recalculatedEstimatedSize[0]) {
@@ -701,6 +718,7 @@ public class FileUploadOperation {
     private static final int UPLOAD_STALL_MAX_TOTAL_RESTARTS = 8;
     private static final long UPLOAD_STALL_RESET_AFTER_MS = 600_000L;
     private static final int UPLOAD_PREMIUM_FLOOD_WAIT_MAX_CHECKS = 12;
+    private static final long UPLOAD_CONVERSION_STALL_MS = 90_000L;
 
     private int uploadStallRestarts;
     private int uploadStallTotalRestarts;
@@ -728,8 +746,20 @@ public class FileUploadOperation {
         } else {
             stalled = currentUploadRequetsCount > 0 && now - lastProgressUpdateTime > UPLOAD_STALL_DETECT_MS;
         }
+        if (streamingConversion && !caughtPremiumFloodWait && currentUploadRequetsCount == 0 && now - lastDataAvailableTime > UPLOAD_CONVERSION_STALL_MS) {
+            if (BuildVars.LOGS_ENABLED) {
+                FileLog.d("debug_uploading: conversion stalled for " + (now - lastDataAvailableTime) + "ms, failing " + uploadingFilePath);
+            }
+            state = 4;
+            delegate.didFailedUploadingFile(this);
+            cleanup();
+            return;
+        }
         if (stalled) {
             if (uploadStallRestarts >= UPLOAD_STALL_MAX_RESTARTS || uploadStallTotalRestarts >= UPLOAD_STALL_MAX_TOTAL_RESTARTS) {
+                if (BuildVars.LOGS_ENABLED) {
+                    FileLog.d("debug_uploading: stall restart budget exhausted, failing " + uploadingFilePath);
+                }
                 state = 4;
                 delegate.didFailedUploadingFile(this);
                 cleanup();
@@ -738,7 +768,12 @@ public class FileUploadOperation {
             uploadStallRestarts++;
             uploadStallTotalRestarts++;
             lastStallRestartAt = now;
+            if (BuildVars.LOGS_ENABLED) {
+                FileLog.d("debug_uploading: stall detected, restart " + uploadStallRestarts + "/" + UPLOAD_STALL_MAX_RESTARTS + " total " + uploadStallTotalRestarts + "/" + UPLOAD_STALL_MAX_TOTAL_RESTARTS + " " + uploadingFilePath);
+            }
             restartStalledUpload(UPLOAD_STALL_RESTART_DELAY_MS << (uploadStallRestarts - 1));
+        } else if (BuildVars.LOGS_ENABLED && (streamingConversion || currentUploadRequetsCount > 0)) {
+            FileLog.d("debug_uploading: stall check ok requests=" + currentUploadRequetsCount + " progressAge=" + (now - lastProgressUpdateTime) + "ms chunkAge=" + (now - lastDataAvailableTime) + "ms floodWait=" + caughtPremiumFloodWait + " " + uploadingFilePath);
         }
         AndroidUtilities.runOnUIThread(uploadStallCheck, UPLOAD_STALL_DETECT_MS);
     }

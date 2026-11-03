@@ -23,6 +23,8 @@ public class VideoEncodingService extends Service implements NotificationCenter.
 
     int currentAccount;
     String currentPath;
+    private boolean conversionActive;
+    private int conversionPercent;
 
     public VideoEncodingService() {
         super();
@@ -76,6 +78,7 @@ public class VideoEncodingService extends Service implements NotificationCenter.
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploadProgressChanged);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploadFailed);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploaded);
+        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileNewChunkAvailable);
         currentMessage = null;
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("VideoEncodingService: destroy video service");
@@ -92,7 +95,28 @@ public class VideoEncodingService extends Service implements NotificationCenter.
                 float progress = Math.min(1f, loadedSize / (float) totalSize);
                 Boolean enc = (Boolean) args[3];
                 int currentProgress = (int) (progress * 100);
+                if (conversionActive) {
+                    currentProgress = conversionPercent;
+                }
                 builder.setProgress(100, currentProgress, currentProgress == 0);
+                updateNotification();
+            }
+        } else if (id == NotificationCenter.fileNewChunkAvailable) {
+            String fileName = (String) args[1];
+            long finalSize = (Long) args[3];
+            Float progress = (Float) args[4];
+            if (account == currentAccount && currentPath != null && currentPath.equals(fileName)) {
+                conversionActive = finalSize == 0;
+                conversionPercent = (int) ((progress == null ? 0f : progress) * 100);
+                builder.setProgress(100, conversionActive ? conversionPercent : 0, conversionActive ? false : true);
+                boolean isGif = currentMessage != null && MessageObject.isGifMessage(currentMessage.messageObject.messageOwner);
+                if (isGif) {
+                    builder.setContentText(LocaleController.getString(R.string.SendingGif));
+                } else if (conversionActive) {
+                    builder.setContentText(LocaleController.formatString(R.string.ProcessingVideo, conversionPercent));
+                } else {
+                    builder.setContentText(LocaleController.getString(R.string.SendingVideo));
+                }
                 updateNotification();
             }
         } else if (id == NotificationCenter.fileUploaded || id == NotificationCenter.fileUploadFailed) {
@@ -178,14 +202,18 @@ public class VideoEncodingService extends Service implements NotificationCenter.
             NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploadProgressChanged);
             NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploadFailed);
             NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploaded);
+            NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileNewChunkAvailable);
         }
         updateBuilderForMessage(message);
         currentMessage = message;
         currentAccount = message.currentAccount;
         currentPath = message.messageObject.messageOwner.attachPath;
+        conversionActive = message.messageObject.messageOwner.params != null && message.messageObject.messageOwner.params.containsKey("ve");
+        conversionPercent = 0;
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadProgressChanged);
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadFailed);
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploaded);
+        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileNewChunkAvailable);
         if (isRunning()) {
             updateNotification();
         }
