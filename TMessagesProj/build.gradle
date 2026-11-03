@@ -35,6 +35,7 @@ idea {
 
 def buildTimestamp = System.getenv('BUILD_TIMESTAMP') ?: '0'
 def commitId = System.getenv('COMMIT_ID')
+def gitCommit = System.getenv('COMMIT_ID') ?: System.getenv('GITHUB_SHA') ?: ''
 def verName = "${APP_VERSION_NAME}${commitId?.take(7) ? "-${commitId.take(7)}" : ''}"
 def verCode = 1261
 
@@ -183,6 +184,7 @@ android {
         buildConfigField 'int', 'APP_ID', appId
         buildConfigField 'String', 'APP_HASH', '"' + appHash + '"'
         buildConfigField 'long', 'BUILD_TIMESTAMP', buildTimestamp + 'L'
+        buildConfigField 'String', 'GIT_COMMIT', '"' + gitCommit + '"'
         buildConfigField 'boolean', 'TURBO_BASE', isTurboBase.toString()
 
         externalNativeBuild {

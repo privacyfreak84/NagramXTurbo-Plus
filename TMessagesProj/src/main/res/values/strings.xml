@@ -11615,6 +11615,14 @@
     <string name="QuickShareSavedMessagesAlreadyIncluded">Saved Messages is already included automatically.</string>
     <string name="QuickShareDestinationNotAvailable">This destination is no longer available or cannot receive messages.</string>
     <string name="QuickShareDestinationsLimit">The quick-share wheel supports up to four configured destinations plus Saved Messages.</string>
+    <string name="QuickReactionForwardEnabled">Also forward on quick reaction</string>
+    <string name="QuickReactionForwardEnabledAbout">When a quick reaction is sent (swipe or wheel), also forward the message to the chat below.</string>
+    <string name="QuickReactionForwardDestination">Forward destination</string>
+    <string name="QuickReactionForwardDestinationHint">Choose one channel, group or chat. Messages are forwarded there together with every quick reaction.</string>
+    <string name="QuickReactionForwardNotSet">Not set</string>
+    <string name="QuickReactionForwardChoose">Choose chat</string>
+    <string name="QuickReactionForwardClear">Clear</string>
+    <string name="QuickReactionForwardNeedsDestination">Choose a forward destination first.</string>
     <string name="WalletSearchGifts">Search gifts</string>
     <string name="WalletGiftOnCard">On Card</string>
     <string name="WalletGiftAddToCard">Add to Card</string>

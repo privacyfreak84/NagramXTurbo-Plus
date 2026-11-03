@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 concurrency:
   group: upstream-turbo-sync
@@ -42,8 +43,19 @@ jobs:
           git switch --force-create automation/upstream-sync "origin/${FORK_DEFAULT_BRANCH}"
           before_merge="$(git rev-parse HEAD)"
           if ! git merge --no-edit "upstream/${upstream_branch}"; then
-            echo "::error title=Upstream sync has merge conflicts::Resolve conflicts between upstream/${upstream_branch} and ${FORK_DEFAULT_BRANCH} locally, then push the result. No user's branch was force-updated."
-            git diff --name-only --diff-filter=U || true
+            conflicted="$(git diff --name-only --diff-filter=U || true)"
+            git merge --abort || true
+            echo "::warning title=Upstream sync has merge conflicts::Upstream ${upstream_branch} conflicts with ${FORK_DEFAULT_BRANCH}. Tracking issue opened or updated; no branch was changed."
+            issue_title="Upstream sync needs manual conflict resolution"
+            issue_body="$(printf 'Merging `%s/%s` into `%s` hit conflicts in:\n\n```\n%s\n```\n\nResolve locally: `git fetch upstream %s && git switch %s && git merge upstream/%s`, fix the files (keep the de-Google removals), then push. This workflow changed no branch.' "$upstream_repo" "$upstream_branch" "$FORK_DEFAULT_BRANCH" "$conflicted" "$upstream_branch" "$FORK_DEFAULT_BRANCH" "$upstream_branch")"
+            existing_issue="$(gh issue list --repo "$GH_REPO" --state open --search "\"${issue_title}\" in:title" --json number --jq '.[0].number // empty' || true)"
+            if [[ -n "$existing_issue" ]]; then
+              gh issue comment "$existing_issue" --repo "$GH_REPO" --body "$issue_body" && exit 0
+            else
+              gh issue create --repo "$GH_REPO" --title "$issue_title" --body "$issue_body" && exit 0
+            fi
+            echo "::error title=Upstream sync has merge conflicts::Could not open a tracking issue (are issues enabled on this fork?). Resolve conflicts between upstream/${upstream_branch} and ${FORK_DEFAULT_BRANCH} locally, then push the result."
+            echo "$conflicted"
             exit 1
           fi
           after_merge="$(git rev-parse HEAD)"

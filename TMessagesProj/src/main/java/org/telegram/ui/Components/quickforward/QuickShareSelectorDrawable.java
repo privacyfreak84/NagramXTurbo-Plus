@@ -97,6 +97,9 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
     private final Paint wheelActionBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint wheelActionTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint wheelActionOutlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint wheelHighlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // 0..1 hover amount per wheel slot (4 reactions, then the recipients), eased toward the selection
+    private final float[] hover = new float[REACTION_ACTION_COUNT + 5];
     private final Drawable shadowDrawable;
     public final ChatMessageCell cell;
     public final MessageObject messageObject;
@@ -521,23 +524,36 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
         wheelActionOutlinePaint.setStyle(Paint.Style.STROKE);
         wheelActionOutlinePaint.setStrokeWidth(dp(1));
 
+        final int accent = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, cell.getResourcesProvider());
+        boolean animating = false;
+        for (int i = 0; i < hover.length; i++) {
+            final float target = selectedActionIndex == i ? 1f : 0f;
+            final float delta = target - hover[i];
+            if (Math.abs(delta) > 0.01f) {
+                hover[i] += delta * 0.35f;
+                animating = true;
+            } else {
+                hover[i] = target;
+            }
+        }
+
+        // Reactions sit directly on the bubble like Telegram's reaction bar: a soft tinted disc at rest,
+        // an accent-tinted disc and a slightly larger emoji while the finger is over them.
+        final float baseTextSize = dp(23);
         for (int i = 0; i < REACTION_ACTION_COUNT; i++) {
             if (reactionEmojis[i] == null || reactionEmojis[i].isEmpty()) {
                 continue;
             }
+            final float h = hover[i];
             PointF center = reactionCenter(i);
-            canvas.drawCircle(center.x, center.y, dp(19), wheelActionBgPaint);
-            canvas.drawCircle(center.x, center.y, dp(19), wheelActionOutlinePaint);
-            if (selectedActionIndex == i) {
-                wheelActionOutlinePaint.setAlpha(paintAlpha);
-                wheelActionOutlinePaint.setStrokeWidth(dp(2));
-                canvas.drawCircle(center.x, center.y, dp(21), wheelActionOutlinePaint);
-                wheelActionOutlinePaint.setAlpha((int) (paintAlpha * 0.35f));
-                wheelActionOutlinePaint.setStrokeWidth(dp(1));
-            }
+            wheelHighlightPaint.setColor(h > 0.01f ? accent : iconColor);
+            wheelHighlightPaint.setAlpha((int) (paintAlpha * (0.07f + 0.15f * h)));
+            canvas.drawCircle(center.x, center.y, dp(19) + dp(2) * h, wheelHighlightPaint);
+            wheelActionTextPaint.setTextSize(baseTextSize * (1f + 0.22f * h));
             float baseline = center.y - (wheelActionTextPaint.ascent() + wheelActionTextPaint.descent()) / 2f;
             canvas.drawText(reactionEmojis[i], center.x, baseline, wheelActionTextPaint);
         }
+        wheelActionTextPaint.setTextSize(baseTextSize);
 
         // Draw the selected recipient last. Recipient name bubbles are disabled
         // by drawWheel(), leaving a clean icon/avatar-only radial menu.
@@ -561,15 +577,17 @@ public class QuickShareSelectorDrawable extends Drawable implements Animator.Ani
                         bubbleCurrent.left,
                         bubbleCurrent.right,
                         center.x, center.y, radius, alpha, false);
-                if (selectedActionIndex == REACTION_ACTION_COUNT + i) {
-                    wheelActionOutlinePaint.setColor(iconColor);
-                    wheelActionOutlinePaint.setAlpha(paintAlpha);
-                    wheelActionOutlinePaint.setStrokeWidth(dp(2));
-                    canvas.drawCircle(center.x, center.y, Math.max(radius, dp(21)) + dp(2), wheelActionOutlinePaint);
-                    wheelActionOutlinePaint.setAlpha((int) (paintAlpha * 0.35f));
-                    wheelActionOutlinePaint.setStrokeWidth(dp(1));
+                final float hv = hover[REACTION_ACTION_COUNT + i];
+                if (hv > 0.01f) {
+                    wheelActionOutlinePaint.setColor(accent);
+                    wheelActionOutlinePaint.setAlpha((int) (paintAlpha * hv));
+                    wheelActionOutlinePaint.setStrokeWidth(dp(2.5f));
+                    canvas.drawCircle(center.x, center.y, Math.max(radius, dp(21)) + dp(3), wheelActionOutlinePaint);
                 }
             }
+        }
+        if (animating) {
+            parent.invalidate();
         }
     }
 

@@ -186,6 +186,10 @@ object NaConfig {
         addConfig("QuickReactionDownEmoji", ConfigItem.configTypeString, "🔥")
     val quickShareDestinationIds =
         addConfig("QuickShareDestinationIds", ConfigItem.configTypeString, "")
+    val quickReactionForwardEnabled =
+        addConfig("QuickReactionForwardEnabled", ConfigItem.configTypeBool, false)
+    val quickReactionForwardDestinationId =
+        addConfig("QuickReactionForwardDestinationId", ConfigItem.configTypeString, "")
     val showNoQuoteForward =
         addConfig(
             "NoQuoteForward",

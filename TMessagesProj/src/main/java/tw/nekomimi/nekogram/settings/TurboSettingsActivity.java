@@ -200,6 +200,15 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
             getString(R.string.QuickShareDestinations),
             value -> quickShareDestinationSummary(value),
             null, null, null));
+    private final AbstractConfigCell quickReactionForwardEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getQuickReactionForwardEnabled(), getString(R.string.QuickReactionForwardEnabledAbout)));
+    private final AbstractConfigCell quickReactionForwardDestinationRow = cellGroup.appendCell(new ConfigCellTextDetail(
+            NaConfig.INSTANCE.getQuickReactionForwardDestinationId(),
+            (view, position) -> showQuickReactionForwardDialog(),
+            getString(R.string.QuickReactionForwardDestinationHint),
+            false,
+            getString(R.string.QuickReactionForwardDestination),
+            value -> quickReactionForwardSummary(value),
+            null, null, null));
     private final AbstractConfigCell forwardProtectedModeRow = BuildVars.TURBO_BASE ? null : cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getForwardProtectedMode(), new String[]{
             getString(R.string.ForwardProtectedModeAsk),
             getString(R.string.ForwardProtectedModeAlways),
@@ -544,6 +553,79 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
             if (limitReached) {
                 AndroidUtilities.runOnUIThread(() -> showQuickShareInfo(getString(R.string.QuickShareDestinationsLimit)));
             }
+            return true;
+        });
+        presentFragment(picker);
+    }
+
+    private long parseQuickReactionForwardId() {
+        try {
+            String raw = NaConfig.INSTANCE.getQuickReactionForwardDestinationId().String();
+            return raw == null || raw.trim().isEmpty() ? 0L : Long.parseLong(raw.trim());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private String quickReactionForwardSummary(String storedValue) {
+        long id = 0L;
+        try {
+            id = storedValue == null || storedValue.trim().isEmpty() ? 0L : Long.parseLong(storedValue.trim());
+        } catch (NumberFormatException ignore) {
+        }
+        return id == 0L ? getString(R.string.QuickReactionForwardNotSet) : quickShareDestinationName(id);
+    }
+
+    private void refreshQuickReactionForwardRow() {
+        int row = cellGroup.rows.indexOf(quickReactionForwardDestinationRow);
+        if (row >= 0 && cellGroup.getListAdapter() != null) {
+            cellGroup.getListAdapter().notifyItemChanged(row);
+        }
+    }
+
+    private void showQuickReactionForwardDialog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        long current = parseQuickReactionForwardId();
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(getString(R.string.QuickReactionForwardDestination));
+        builder.setMessage(quickReactionForwardSummary(current == 0L ? "" : String.valueOf(current)));
+        builder.setPositiveButton(getString(R.string.QuickReactionForwardChoose),
+                (dialog, which) -> AndroidUtilities.runOnUIThread(this::selectQuickReactionForwardDestination));
+        if (current != 0L) {
+            builder.setNegativeButton(getString(R.string.QuickReactionForwardClear), (dialog, which) -> {
+                NaConfig.INSTANCE.getQuickReactionForwardDestinationId().setConfigString("");
+                refreshQuickReactionForwardRow();
+            });
+            builder.setNeutralButton(getString(R.string.Cancel), null);
+        } else {
+            builder.setNegativeButton(getString(R.string.Cancel), null);
+        }
+        showDialog(builder.create());
+    }
+
+    private void selectQuickReactionForwardDestination() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        Bundle args = new Bundle();
+        args.putBoolean("onlySelect", true);
+        args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
+        args.putBoolean("canSelectTopics", false);
+        DialogsActivity picker = new DialogsActivity(args);
+        picker.setDelegate((selectedFragment, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
+            if (dids == null || dids.isEmpty()) {
+                return false;
+            }
+            MessagesStorage.TopicKey selected = dids.get(0);
+            if (selected == null || selected.topicId != 0 || !isQuickShareDestinationEligible(selected.dialogId)) {
+                showQuickShareInfo(getString(R.string.QuickShareDestinationNotAvailable));
+                return false;
+            }
+            NaConfig.INSTANCE.getQuickReactionForwardDestinationId().setConfigString(String.valueOf(selected.dialogId));
+            refreshQuickReactionForwardRow();
+            selectedFragment.finishFragment();
             return true;
         });
         presentFragment(picker);

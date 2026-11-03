@@ -78,7 +78,7 @@ public class ApkDownloader {
     private static final byte[] APK_ZIP_MAGIC = {'P', 'K', 3, 4};
     // Defence-in-depth: only ever install an APK fetched from this project's own
     // GitHub Release, even if the metadata-channel manifest were compromised.
-    private static final String GITHUB_RELEASE_PREFIX = "https://github.com/temporaryna/NagramXTurbo/releases/";
+    private static final String GITHUB_RELEASE_PREFIX = "https://github.com/privacyfreak84/NagramXTurbo-Plus/releases/";
 
     // Dedicated single-thread executor: a 50MB download must not block the shared
     // Utilities.globalQueue (used by polling, message events, etc.).

@@ -42014,6 +42014,63 @@ public class ChatActivity extends BaseFragment implements
             }
             selectReaction(reactionCell != null ? reactionCell : cell, messageObject, null, null, reactionX, reactionY,
                     ReactionsLayoutInBubble.VisibleReaction.fromEmojicon(canonicalEmoji), false, false, true, false);
+            forwardAfterQuickReaction(messageObject);
+        }
+
+        private void forwardAfterQuickReaction(MessageObject messageObject) {
+            if (!NaConfig.INSTANCE.getQuickReactionForwardEnabled().Bool()) {
+                return;
+            }
+            long did = 0L;
+            try {
+                String raw = NaConfig.INSTANCE.getQuickReactionForwardDestinationId().String();
+                did = raw == null || raw.trim().isEmpty() ? 0L : Long.parseLong(raw.trim());
+            } catch (NumberFormatException ignore) {
+            }
+            if (did == 0L) {
+                BulletinFactory.of(ChatActivity.this).createSimpleBulletin(R.raw.info, LocaleController.getString(R.string.QuickReactionForwardNeedsDestination)).show();
+                return;
+            }
+            if (did == dialog_id) {
+                return; // already in the destination chat
+            }
+            boolean usable;
+            if (DialogObject.isUserDialog(did)) {
+                usable = getMessagesController().getUser(did) != null;
+            } else {
+                TLRPC.Chat targetChat = getMessagesController().getChat(-did);
+                usable = targetChat != null && !ChatObject.isNotInChat(targetChat);
+            }
+            if (!usable) {
+                BulletinFactory.of(ChatActivity.this).createSimpleBulletin(R.raw.info, LocaleController.getString(R.string.QuickShareDestinationNotAvailable)).show();
+                return;
+            }
+            if (AlertsCreator.checkSlowMode(getContext(), currentAccount, did, false)) {
+                return;
+            }
+            ArrayList<MessageObject> toForward = null;
+            if (messageObject.getGroupId() != 0) {
+                MessageObject.GroupedMessages groupedMessages = groupedMessagesMap.get(messageObject.getGroupId());
+                if (groupedMessages != null) {
+                    toForward = groupedMessages.messages;
+                }
+            }
+            if (toForward == null) {
+                toForward = new ArrayList<>();
+                toForward.add(messageObject);
+            }
+            final int result = SendMessagesHelper.getInstance(currentAccount).sendMessage(
+                    toForward, did, false, false,
+                    !NaConfig.INSTANCE.getSilentMessageByDefault().Bool(),
+                    0, 0, null, -1, 0,
+                    getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+            AlertsCreator.showSendMediaAlert(result, ChatActivity.this, null);
+            Bulletin bulletin = BulletinFactory.createForwardedBulletin(getContext(),
+                    ChatActivity.this, null, 1, did, 1,
+                    getThemedColor(Theme.key_undo_background),
+                    getThemedColor(Theme.key_undo_infoColor),
+                    Bulletin.DURATION_SHORT);
+            bulletin.allowBlur().show(bulletin.getLayout() instanceof Bulletin.LottieLayoutWithReactions);
         }
 
         private String resolveQuickReactionEmoji(String emoji) {

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Build;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
@@ -21,6 +22,14 @@ import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -287,13 +296,133 @@ public class UpdateHelper extends BaseRemoteHelper {
         }
     }
 
+    private static final String FORK_LATEST_RELEASE_API = "https://api.github.com/repos/privacyfreak84/NagramXTurbo-Plus/releases/latest";
+    private static OkHttpClient releaseClient;
+
+    private static synchronized OkHttpClient getReleaseClient() {
+        if (releaseClient == null) {
+            releaseClient = new OkHttpClient.Builder()
+                    .connectTimeout(20, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .build();
+        }
+        return releaseClient;
+    }
+
     public void checkNewVersionAvailable(Delegate delegate) {
         checkNewVersionAvailable(delegate, false);
     }
 
+    /**
+     * Updates come only from this fork's own GitHub releases (not upstream Turbo's metadata channel).
+     * A release counts as new when it was built from a different commit than the installed app and was
+     * published after the installed app was built, so installing a release never offers that same release.
+     */
     public void checkNewVersionAvailable(Delegate delegate, boolean updateAlways) {
-        this.updateAlways = updateAlways;
-        load(delegate);
+        if (NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_OFF) {
+            delegate.onTLResponse(null, null);
+            return;
+        }
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(FORK_LATEST_RELEASE_API)
+                        .header("Accept", "application/vnd.github+json")
+                        .build();
+                try (Response response = getReleaseClient().newCall(request).execute()) {
+                    if (response.code() == 404) {
+                        delegate.onTLResponse(null, null); // no release published yet
+                        return;
+                    }
+                    if (!response.isSuccessful() || response.body() == null) {
+                        delegate.onTLResponse(null, "HTTP " + response.code());
+                        return;
+                    }
+                    JSONObject release = new JSONObject(response.body().string());
+                    TLRPC.TL_help_appUpdate update = buildForkUpdate(release, updateAlways);
+                    if (update != null) {
+                        preferences.edit().putBoolean(UPDATE_IS_BETA_KEY, false).apply();
+                    }
+                    delegate.onTLResponse(update, null);
+                }
+            } catch (Exception e) {
+                delegate.onTLResponse(null, e.getMessage() != null ? e.getMessage() : "Update check failed");
+            }
+        });
+    }
+
+    private static TLRPC.TL_help_appUpdate buildForkUpdate(JSONObject release, boolean always) {
+        if (release.optBoolean("draft", false)) {
+            return null;
+        }
+        String url = pickApkUrl(release.optJSONArray("assets"));
+        if (url == null) {
+            return null;
+        }
+        boolean newer = false;
+        String installed = BuildConfig.GIT_COMMIT;
+        String target = release.optString("target_commitish", "");
+        if (installed.length() >= 7 && target.matches("[0-9a-fA-F]{40}")) {
+            boolean differentCommit = !target.regionMatches(true, 0, installed, 0, 7);
+            newer = differentCommit && parseIsoSeconds(release.optString("published_at", "")) > BuildConfig.BUILD_TIMESTAMP;
+        }
+        if (!newer && !always) {
+            return null;
+        }
+        String tag = release.optString("tag_name", "");
+        String name = release.optString("name", "");
+        TLRPC.TL_help_appUpdate update = new TLRPC.TL_help_appUpdate();
+        update.version = tag.isEmpty() ? name : tag;
+        update.can_not_skip = false;
+        update.url = url;
+        update.flags |= 4;
+        update.text = release.optString("body", "");
+        update.entities = new ArrayList<>();
+        return update;
+    }
+
+    private static String pickApkUrl(JSONArray assets) {
+        if (assets == null) {
+            return null;
+        }
+        String arm64 = null, armv7 = null, any = null;
+        for (int i = 0; i < assets.length(); i++) {
+            JSONObject asset = assets.optJSONObject(i);
+            if (asset == null) {
+                continue;
+            }
+            String name = asset.optString("name", "");
+            String link = asset.optString("browser_download_url", "");
+            if (!name.endsWith(".apk") || link.isEmpty()) {
+                continue;
+            }
+            if (name.contains("arm64-v8a")) {
+                arm64 = link;
+            } else if (name.contains("armeabi-v7a")) {
+                armv7 = link;
+            } else if (any == null) {
+                any = link;
+            }
+        }
+        for (String abi : Build.SUPPORTED_ABIS) {
+            if ("arm64-v8a".equals(abi) && arm64 != null) {
+                return arm64;
+            }
+            if ("armeabi-v7a".equals(abi) && armv7 != null) {
+                return armv7;
+            }
+        }
+        return arm64 != null ? arm64 : (armv7 != null ? armv7 : any);
+    }
+
+    private static long parseIsoSeconds(String iso) {
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+            format.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return format.parse(iso).getTime() / 1000L;
+        } catch (Exception e) {
+            return 0L;
+        }
     }
 
     private static final class InstanceHolder {
