@@ -1,0 +1,39 @@
+name: Release APK from run
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+      tag:
+        required: true
+      sha:
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n Staging -D out
+          find out -type f
+          cat > notes.md <<'NOTES'
+          NagramXTurbo-Plus: upstream 13.1.1 sync plus fork changes.
+
+          - Synced with upstream Turbo 13.1.1; the new QR scanner uses ZXing only (no Google Vision).
+          - In-app updates now come only from this fork's GitHub releases, not upstream Turbo.
+          - New option: also forward the message to a chosen chat when you send a quick reaction (Turbo settings, quick-reaction section).
+          - Restyled the share-button hold wheel (soft reaction chips, hover scale, accent selection ring).
+          - Weekly upstream-sync workflow now opens an issue on merge conflicts instead of failing.
+
+          Built by CI from commit 19fbf5184 with no Google services config. CI proves it compiles and packages; features were not tested by CI. Older installs still use the old update check until they install this version.
+          NOTES
+          APKS=$(find out -name '*.apk')
+          gh release create "$TAG" $APKS -R "$GITHUB_REPOSITORY" --target "$SHA" --title "NagramXTurbo-Plus $TAG" --notes-file notes.md
