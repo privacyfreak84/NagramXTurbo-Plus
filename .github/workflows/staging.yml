@@ -73,7 +73,8 @@ jobs:
       - name: Decode keystore
         env:
           KEYSTORE: ${{ secrets.KEYSTORE }}
-        run: echo "$KEYSTORE" | base64 -d > TMessagesProj/nagramxturbo.jks
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+        run: echo "${SIGNING_KEYSTORE:-$KEYSTORE}" | base64 -d > TMessagesProj/nagramxturbo.jks
       - name: Modify Gradle JVM Args
         run: |
           MEMORY_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
@@ -89,6 +90,9 @@ jobs:
         env:
           COMMIT_ID: ${{ github.sha }}
           TURBO_BUILD_NUMBER: ${{ vars.TURBO_BUILD_NUMBER }}
+          SIGNING_KEYSTORE_PASS: ${{ secrets.SIGNING_KEYSTORE_PASS }}
+          SIGNING_ALIAS: ${{ secrets.SIGNING_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
         run: |
           if [ -z "$TURBO_BUILD_NUMBER" ]; then
             echo "::error::TURBO_BUILD_NUMBER repo variable is unset — failing closed to avoid version regression. Set: gh variable set TURBO_BUILD_NUMBER --body <N> -R temporaryna/NagramXTurbo"
@@ -139,6 +143,9 @@ jobs:
         env:
           COMMIT_ID: ${{ github.sha }}
           TURBO_BUILD_NUMBER: ${{ vars.TURBO_BUILD_NUMBER }}
+          SIGNING_KEYSTORE_PASS: ${{ secrets.SIGNING_KEYSTORE_PASS }}
+          SIGNING_ALIAS: ${{ secrets.SIGNING_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
           BUILD_TIMESTAMP: ${{ steps.staging_build_step.outputs.build_timestamp }}
         run: |
           export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"

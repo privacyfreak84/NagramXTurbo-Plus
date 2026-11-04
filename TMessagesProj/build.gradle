@@ -66,6 +66,14 @@ keystorePwd = keystorePwd ?: System.getenv('KEYSTORE_PASS')
 alias = alias ?: System.getenv('ALIAS_NAME')
 pwd = pwd ?: System.getenv('ALIAS_PASS')
 
+// Dedicated signing secrets (CI) take priority over anything inside LOCAL_PROPERTIES.
+def ownSigning = System.getenv('SIGNING_KEYSTORE_PASS') && System.getenv('SIGNING_ALIAS') && System.getenv('SIGNING_KEY_PASS')
+if (ownSigning) {
+    keystorePwd = System.getenv('SIGNING_KEYSTORE_PASS')
+    alias = System.getenv('SIGNING_ALIAS')
+    pwd = System.getenv('SIGNING_KEY_PASS')
+}
+
 configurations.all {
     exclude group: 'androidx.recyclerview', module: 'recyclerview'
     exclude group: 'com.google.crypto.tink', module: 'tink'
@@ -250,7 +258,8 @@ android {
                 proguardFiles 'proguard-turbo-base.pro'
             }
             matchingFallbacks = ['release', 'staging', 'debug']
-            signingConfig = signingConfigs.debug
+            // Stable fork key when the SIGNING_* secrets exist; otherwise the throwaway debug key (updates then can't install over older builds)
+            signingConfig = ownSigning ? signingConfigs.release : signingConfigs.debug
         }
 
         release {
