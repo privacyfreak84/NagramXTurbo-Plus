@@ -40,6 +40,10 @@
     <string name="ButtonOutlineEnabled">Button Outline</string>
     <string name="NagramXTurbo">Turbo</string>
     <string name="TurboChannel">Channel</string>
+    <string name="TurboPlusName" translatable="false">NagramXTurbo-Plus</string>
+    <string name="TurboPlusTagline">A de-Googled fork of Nagram X Turbo</string>
+    <string name="TurboReleases">Releases</string>
+    <string name="TurboUpstream">Based on</string>
     <string name="TurboVersion">Version</string>
     <string name="ForwardingSettings">Forwarding</string>
     <string name="ForwardProtectedMode">Forward Protected Messages</string>

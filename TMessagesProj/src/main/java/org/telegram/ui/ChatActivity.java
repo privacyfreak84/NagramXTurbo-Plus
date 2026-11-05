@@ -42035,7 +42035,9 @@ public class ChatActivity extends BaseFragment implements
                 return; // already in the destination chat
             }
             boolean usable;
-            if (DialogObject.isUserDialog(did)) {
+            if (did == getUserConfig().getClientUserId()) {
+                usable = true; // Saved Messages
+            } else if (DialogObject.isUserDialog(did)) {
                 usable = getMessagesController().getUser(did) != null;
             } else {
                 TLRPC.Chat targetChat = getMessagesController().getChat(-did);
