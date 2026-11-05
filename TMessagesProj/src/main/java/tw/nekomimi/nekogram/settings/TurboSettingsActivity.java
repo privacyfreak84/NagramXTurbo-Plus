@@ -211,16 +211,18 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
             value -> quickReactionForwardSummary(value),
             null, null, null));
     private final AbstractConfigCell dwellForwardEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getDwellForwardEnabled(), getString(R.string.DwellForwardEnabledAbout)));
-    private final AbstractConfigCell dwellForwardSecondsRow = cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getDwellForwardSeconds(), new String[]{
-            LocaleController.formatPluralString("Seconds", 1),
-            LocaleController.formatPluralString("Seconds", 2),
-            LocaleController.formatPluralString("Seconds", 3),
-            LocaleController.formatPluralString("Seconds", 5),
-            LocaleController.formatPluralString("Seconds", 10),
-            LocaleController.formatPluralString("Seconds", 15),
-            LocaleController.formatPluralString("Seconds", 30),
-            LocaleController.formatPluralString("Seconds", 60)
-    }, new int[]{1, 2, 3, 5, 10, 15, 30, 60}, null));
+    private static final int[] DWELL_FORWARD_MILLIS = {500, 750, 1000, 1500, 2000, 3000, 5000, 10000, 15000, 30000, 60000};
+
+    private static String[] dwellForwardLabels() {
+        java.text.DecimalFormat format = new java.text.DecimalFormat("0.##");
+        String[] labels = new String[DWELL_FORWARD_MILLIS.length];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = LocaleController.formatString(R.string.DwellForwardSecondsShort, format.format(DWELL_FORWARD_MILLIS[i] / 1000.0));
+        }
+        return labels;
+    }
+
+    private final AbstractConfigCell dwellForwardMillisRow = cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getDwellForwardMillis(), dwellForwardLabels(), DWELL_FORWARD_MILLIS, null));
     private final AbstractConfigCell dwellForwardScopeRow = cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getDwellForwardScope(), new String[]{
             getString(R.string.DwellForwardScopeChannels),
             getString(R.string.DwellForwardScopePicked),
@@ -656,6 +658,8 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
         // The "forward" picker hides channels you cannot post in, which are exactly the ones wanted here.
         args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_DEFAULT);
         args.putBoolean("canSelectTopics", false);
+        // We only read from these chats, so read-only channels must be selectable.
+        args.putBoolean("checkCanWrite", false);
         DialogsActivity picker = new DialogsActivity(args);
         picker.setDelegate((selectedFragment, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
             if (dids == null || dids.isEmpty()) {

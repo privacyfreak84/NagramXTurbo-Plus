@@ -192,8 +192,11 @@ object NaConfig {
         addConfig("QuickReactionForwardDestinationId", ConfigItem.configTypeString, "")
     val dwellForwardEnabled =
         addConfig("DwellForwardEnabled", ConfigItem.configTypeBool, false)
+    // Legacy (whole seconds); superseded by dwellForwardMillis and only read once to migrate.
     val dwellForwardSeconds =
         addConfig("DwellForwardSeconds", ConfigItem.configTypeInt, 5)
+    val dwellForwardMillis =
+        addConfig("DwellForwardMillis", ConfigItem.configTypeInt, 5000)
     // 0 = all channels (default), 1 = only chats picked in DwellForwardIncludeIds, 2 = all chats
     val dwellForwardScope =
         addConfig("DwellForwardScope", ConfigItem.configTypeInt, 0)
@@ -1771,6 +1774,12 @@ object NaConfig {
             )
         ) {
             idDcType.setConfigInt(0)
+        }
+        if (!getPreferences().contains(dwellForwardMillis.key) && getPreferences().contains(dwellForwardSeconds.key)) {
+            dwellForwardMillis.setConfigInt(dwellForwardSeconds.Int().coerceIn(1, 60) * 1000)
+        }
+        if (dwellForwardMillis.Int() !in 100..600000) {
+            dwellForwardMillis.setConfigInt(5000)
         }
         if (!getPreferences().contains(cameraInVideoMessages.key)) {
             val legacyRear = getPreferences().getBoolean("RearVideoMessages", false)
