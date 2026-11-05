@@ -1,0 +1,44 @@
+name: Temp release and cleanup
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+      tag:
+        required: true
+      sha:
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n Staging -D out
+          find out -type f
+          cat > notes.md <<'NOTES'
+          - Lingering auto-save now shows the "Forwarded to Saved Messages" popup.
+          - Chats for the lingering include/exclude lists can be picked even if they are read-only channels.
+          - Lingering delay is now selectable from 0.5 s, 0.75 s, 1 s, 1.5 s up to 60 s (an existing setting carries over).
+          - Copies of protected messages that need a download first now show the forwarded popup (also after accepting the large-download prompt).
+          - Signed with the fork's stable key (certificate SHA-256 A5:17:D9:FB:...:D0:5B:CA:7E), so this installs over the previous release without uninstalling.
+
+          Built by CI from commit 17c8857. CI proves it compiles and packages; the changes were not tested on a device.
+          NOTES
+          APKS=$(find out -name '*.apk')
+          gh release create "$TAG" $APKS -R "$GITHUB_REPOSITORY" --target "$SHA" --title "NagramXTurbo-Plus $TAG" --notes-file notes.md
+      - name: Delete merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for b in fix/copy-saved-popup feature/dwell-forward-polish release/dwell-popup-combined; do
+            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$b" && echo "deleted $b"
+          done
