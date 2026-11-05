@@ -5,7 +5,10 @@ import android.content.SharedPreferences;
 
 import org.telegram.messenger.ApplicationLoader;
 
+import xyz.nextalone.nagram.NaConfig;
+
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -34,6 +37,57 @@ public class DwellForwardTracker {
     private final Map<Integer, Long> visibleSince = new HashMap<>();
     /** ids already forwarded (persisted, insertion ordered so the oldest can be trimmed). */
     private final LinkedHashSet<Integer> forwarded = new LinkedHashSet<>();
+
+    public static final int SCOPE_ALL_CHANNELS = 0;
+    public static final int SCOPE_PICKED_CHATS = 1;
+    public static final int SCOPE_ALL_CHATS = 2;
+
+    /** Parses a comma separated list of dialog ids (stale/malformed entries are ignored). */
+    public static ArrayList<Long> parseIds(String raw) {
+        LinkedHashSet<Long> result = new LinkedHashSet<>();
+        if (raw != null && !raw.isEmpty()) {
+            for (String part : raw.split(",")) {
+                try {
+                    long id = Long.parseLong(part.trim());
+                    if (id != 0) {
+                        result.add(id);
+                    }
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        }
+        return new ArrayList<>(result);
+    }
+
+    public static String serializeIds(Collection<Long> ids) {
+        StringBuilder sb = new StringBuilder();
+        for (Long id : ids) {
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(id);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Whether messages of this chat may be saved at all: the exclusion list always wins, then
+     * the scope decides (all channels by default / only picked chats / every chat).
+     */
+    public static boolean isChatAllowed(long dialogId, boolean broadcastChannel) {
+        if (parseIds(NaConfig.INSTANCE.getDwellForwardExcludeIds().String()).contains(dialogId)) {
+            return false;
+        }
+        switch (NaConfig.INSTANCE.getDwellForwardScope().Int()) {
+            case SCOPE_PICKED_CHATS:
+                return parseIds(NaConfig.INSTANCE.getDwellForwardIncludeIds().String()).contains(dialogId);
+            case SCOPE_ALL_CHATS:
+                return true;
+            case SCOPE_ALL_CHANNELS:
+            default:
+                return broadcastChannel;
+        }
+    }
 
     public DwellForwardTracker(int account, long dialogId) {
         this.account = account;

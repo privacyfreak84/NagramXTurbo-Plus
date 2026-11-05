@@ -31837,6 +31837,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         paused = false;
+        refreshDwellForwardScope();
         startDwellForward();
         pausedOnLastMessage = false;
         checkScrollForLoad(false);
@@ -51345,12 +51346,15 @@ public class ChatActivity extends BaseFragment implements
     private static final long DWELL_FORWARD_TICK_MS = 400;
     private DwellForwardTracker dwellForwardTracker;
     private boolean dwellForwardScheduled;
+    private boolean dwellForwardChatAllowed;
+    private boolean dwellForwardScopeResolved;
     private final Runnable dwellForwardRunnable = this::dwellForwardTick;
 
     private boolean dwellForwardApplicable() {
         final long selfId = getUserConfig().getClientUserId();
         return NaConfig.INSTANCE.getDwellForwardEnabled().Bool()
                 && !paused
+                && dwellForwardChatAllowed
                 && chatMode == 0
                 && !inPreviewMode
                 && selfId != 0
@@ -51358,6 +51362,13 @@ public class ChatActivity extends BaseFragment implements
                 && dialog_id != selfId
                 && !DialogObject.isEncryptedDialog(dialog_id)
                 && !isPeerNoForwards();
+    }
+
+    /** Re-reads the scope / exclusion settings for this chat (called whenever the chat resumes). */
+    private void refreshDwellForwardScope() {
+        dwellForwardScopeResolved = currentChat != null || currentUser != null || dialog_id > 0;
+        dwellForwardChatAllowed = DwellForwardTracker.isChatAllowed(dialog_id,
+                currentChat != null && ChatObject.isChannelAndNotMegaGroup(currentChat));
     }
 
     private void startDwellForward() {
@@ -51396,6 +51407,9 @@ public class ChatActivity extends BaseFragment implements
         dwellForwardScheduled = false;
         if (paused || dwellForwardTracker == null || !NaConfig.INSTANCE.getDwellForwardEnabled().Bool()) {
             return;
+        }
+        if (!dwellForwardScopeResolved) {
+            refreshDwellForwardScope(); // chat info may have arrived after onResume
         }
         HashSet<Integer> visibleIds = new HashSet<>();
         HashMap<Integer, MessageObject> byId = new HashMap<>();

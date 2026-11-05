@@ -154,6 +154,19 @@
     <string name="TurboUpdateChannelBetaHint">You have a newer beta — regular updates will return with the next release.</string>
     <string name="ProcessingVideo">Processing video %1$d%%</string>
     <string name="DwellForwardEnabled">Save messages you read to Saved Messages</string>
-    <string name="DwellForwardEnabledAbout">Incoming messages that stay on screen for the time below are forwarded to Saved Messages, once each. Protected chats, secret chats, view-once media and Saved Messages itself are skipped.</string>
+    <string name="DwellForwardEnabledAbout">Incoming messages that stay on screen for the time below are forwarded to Saved Messages, once each. Which chats count is set below (all channels by default). Protected chats, secret chats, view-once media and Saved Messages itself are always skipped.</string>
     <string name="DwellForwardSeconds">Time on screen before saving</string>
+    <string name="DwellForwardScope">Which chats to save from</string>
+    <string name="DwellForwardScopeChannels">All channels</string>
+    <string name="DwellForwardScopePicked">Only chats I pick</string>
+    <string name="DwellForwardScopeAll">All chats</string>
+    <string name="DwellForwardIncluded">Chats to save from</string>
+    <string name="DwellForwardIncludedHint">Used when the setting above is \"Only chats I pick\".</string>
+    <string name="DwellForwardExcluded">Never save from these chats</string>
+    <string name="DwellForwardExcludedHint">Always wins over the setting above, whatever it is.</string>
+    <string name="DwellForwardListEmpty">None</string>
+    <string name="DwellForwardListCount">%1$d chats</string>
+    <string name="DwellForwardListEmptyHint">No chats yet. Tap \"Add chat\" to pick one.</string>
+    <string name="DwellForwardAddChat">Add chat</string>
+    <string name="DwellForwardListFull">This list is full.</string>
 </resources>

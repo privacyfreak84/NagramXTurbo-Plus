@@ -99,6 +99,7 @@ import tw.nekomimi.nekogram.config.cell.ConfigCellCustom;
 import tw.nekomimi.nekogram.config.cell.ConfigCellDivider;
 import tw.nekomimi.nekogram.config.cell.ConfigCellHeader;
 import tw.nekomimi.nekogram.config.cell.ConfigCellSelectBox;
+import tw.nekomimi.nekogram.helpers.DwellForwardTracker;
 import tw.nekomimi.nekogram.config.cell.ConfigCellTextCheck;
 import tw.nekomimi.nekogram.config.cell.ConfigCellTextDetail;
 import tw.nekomimi.nekogram.config.cell.ConfigCellTextCheckIcon;
@@ -220,6 +221,31 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
             LocaleController.formatPluralString("Seconds", 30),
             LocaleController.formatPluralString("Seconds", 60)
     }, new int[]{1, 2, 3, 5, 10, 15, 30, 60}, null));
+    private final AbstractConfigCell dwellForwardScopeRow = cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getDwellForwardScope(), new String[]{
+            getString(R.string.DwellForwardScopeChannels),
+            getString(R.string.DwellForwardScopePicked),
+            getString(R.string.DwellForwardScopeAll)
+    }, new int[]{
+            DwellForwardTracker.SCOPE_ALL_CHANNELS,
+            DwellForwardTracker.SCOPE_PICKED_CHATS,
+            DwellForwardTracker.SCOPE_ALL_CHATS
+    }, null));
+    private final AbstractConfigCell dwellForwardIncludeRow = cellGroup.appendCell(new ConfigCellTextDetail(
+            NaConfig.INSTANCE.getDwellForwardIncludeIds(),
+            (view, position) -> showDwellChatListDialog(NaConfig.INSTANCE.getDwellForwardIncludeIds(), R.string.DwellForwardIncluded),
+            getString(R.string.DwellForwardIncludedHint),
+            false,
+            getString(R.string.DwellForwardIncluded),
+            value -> dwellChatListSummary(value),
+            null, null, null));
+    private final AbstractConfigCell dwellForwardExcludeRow = cellGroup.appendCell(new ConfigCellTextDetail(
+            NaConfig.INSTANCE.getDwellForwardExcludeIds(),
+            (view, position) -> showDwellChatListDialog(NaConfig.INSTANCE.getDwellForwardExcludeIds(), R.string.DwellForwardExcluded),
+            getString(R.string.DwellForwardExcludedHint),
+            false,
+            getString(R.string.DwellForwardExcluded),
+            value -> dwellChatListSummary(value),
+            null, null, null));
     private final AbstractConfigCell forwardProtectedModeRow = BuildVars.TURBO_BASE ? null : cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getForwardProtectedMode(), new String[]{
             getString(R.string.ForwardProtectedModeAsk),
             getString(R.string.ForwardProtectedModeAlways),
@@ -564,6 +590,99 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
             if (limitReached) {
                 AndroidUtilities.runOnUIThread(() -> showQuickShareInfo(getString(R.string.QuickShareDestinationsLimit)));
             }
+            return true;
+        });
+        presentFragment(picker);
+    }
+
+    private static final int MAX_DWELL_CHATS = 300;
+
+    private String dwellChatListSummary(String storedValue) {
+        int count = DwellForwardTracker.parseIds(storedValue).size();
+        return count == 0
+                ? getString(R.string.DwellForwardListEmpty)
+                : LocaleController.formatString(R.string.DwellForwardListCount, count);
+    }
+
+    private void saveDwellChatList(ConfigItem item, List<Long> ids) {
+        item.setConfigString(DwellForwardTracker.serializeIds(ids));
+        if (cellGroup.getListAdapter() != null) {
+            for (AbstractConfigCell row : new AbstractConfigCell[]{dwellForwardIncludeRow, dwellForwardExcludeRow}) {
+                int index = cellGroup.rows.indexOf(row);
+                if (index >= 0) {
+                    cellGroup.getListAdapter().notifyItemChanged(index);
+                }
+            }
+        }
+    }
+
+    /** Lists the chats stored in {@code item}; tapping one removes it, the button adds more. */
+    private void showDwellChatListDialog(ConfigItem item, int titleRes) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        ArrayList<Long> ids = DwellForwardTracker.parseIds(item.String());
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(getString(titleRes));
+        if (ids.isEmpty()) {
+            builder.setMessage(getString(R.string.DwellForwardListEmptyHint));
+        } else {
+            String[] labels = new String[ids.size()];
+            for (int i = 0; i < labels.length; i++) {
+                labels[i] = quickShareDestinationName(ids.get(i));
+            }
+            builder.setItems(labels, (dialog, which) -> {
+                ids.remove(which);
+                saveDwellChatList(item, ids);
+                AndroidUtilities.runOnUIThread(() -> showDwellChatListDialog(item, titleRes));
+            });
+        }
+        builder.setPositiveButton(getString(R.string.DwellForwardAddChat),
+                (dialog, which) -> AndroidUtilities.runOnUIThread(() -> selectDwellChat(item, titleRes)));
+        builder.setNegativeButton(getString(R.string.Close), null);
+        showDialog(builder.create());
+    }
+
+    private void selectDwellChat(ConfigItem item, int titleRes) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        if (DwellForwardTracker.parseIds(item.String()).size() >= MAX_DWELL_CHATS) {
+            showQuickShareInfo(getString(R.string.DwellForwardListFull));
+            return;
+        }
+        Bundle args = new Bundle();
+        args.putBoolean("onlySelect", true);
+        // The "forward" picker hides channels you cannot post in, which are exactly the ones wanted here.
+        args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_DEFAULT);
+        args.putBoolean("canSelectTopics", false);
+        DialogsActivity picker = new DialogsActivity(args);
+        picker.setDelegate((selectedFragment, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
+            if (dids == null || dids.isEmpty()) {
+                return false;
+            }
+            long selfId = UserConfig.getInstance(UserConfig.selectedAccount).clientUserId;
+            ArrayList<Long> current = DwellForwardTracker.parseIds(item.String());
+            boolean changed = false;
+            for (MessagesStorage.TopicKey selected : dids) {
+                if (selected == null) {
+                    continue;
+                }
+                long dialogId = selected.dialogId;
+                if (dialogId == 0 || dialogId == selfId || DialogObject.isEncryptedDialog(dialogId) || current.contains(dialogId)) {
+                    continue;
+                }
+                if (current.size() >= MAX_DWELL_CHATS) {
+                    break;
+                }
+                current.add(dialogId);
+                changed = true;
+            }
+            if (changed) {
+                saveDwellChatList(item, current);
+            }
+            selectedFragment.finishFragment();
+            AndroidUtilities.runOnUIThread(() -> showDwellChatListDialog(item, titleRes));
             return true;
         });
         presentFragment(picker);
