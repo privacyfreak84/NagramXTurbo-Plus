@@ -319,10 +319,6 @@ public class UpdateHelper extends BaseRemoteHelper {
      * published after the installed app was built, so installing a release never offers that same release.
      */
     public void checkNewVersionAvailable(Delegate delegate, boolean updateAlways) {
-        if (NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UPDATE_OFF) {
-            delegate.onTLResponse(null, null);
-            return;
-        }
         Utilities.globalQueue.postRunnable(() -> {
             try {
                 Request request = new Request.Builder()

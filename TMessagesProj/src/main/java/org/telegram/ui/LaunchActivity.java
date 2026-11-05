@@ -6338,6 +6338,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             });
             return;
         }
+        if (!force && NaConfig.INSTANCE.getAutoUpdateChannel().Int() == UpdateHelper.UPDATE_OFF) {
+            return; // automatic checks are switched off; a manual "Check for Updates" still runs
+        }
         if (!force && Math.abs(System.currentTimeMillis() - SharedConfig.lastUpdateCheckTime) < MessagesController.getInstance(0).updateCheckDelay * 1000) {
             return;
         }

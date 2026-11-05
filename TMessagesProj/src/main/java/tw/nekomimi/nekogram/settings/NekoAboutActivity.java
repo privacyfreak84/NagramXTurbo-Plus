@@ -17,8 +17,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.BuildVars;
-import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.ui.ActionBar.Theme;
@@ -33,8 +33,10 @@ public class NekoAboutActivity extends BaseNekoSettingsActivity {
     private static final int TYPE_LOGO_HEADER = 1000;
 
     private int logoHeaderRow;
-    private int channelRow;
+    private int checkUpdateRow;
+    private int releasesRow;
     private int sourceCodeRow;
+    private int upstreamRow;
     private int versionRow;
     private int architectureRow;
     private int datacenterStatusRow;
@@ -44,8 +46,10 @@ public class NekoAboutActivity extends BaseNekoSettingsActivity {
         super.updateRows();
 
         logoHeaderRow = addRow();
-        channelRow = addRow();
+        checkUpdateRow = addRow();
+        releasesRow = addRow();
         sourceCodeRow = addRow();
+        upstreamRow = addRow();
         versionRow = addRow();
         architectureRow = addRow();
         datacenterStatusRow = addRow();
@@ -58,9 +62,13 @@ public class NekoAboutActivity extends BaseNekoSettingsActivity {
 
     @Override
     protected void onItemClick(View view, int position, float x, float y) {
-        if (position == channelRow) {
-            MessagesController.getInstance(currentAccount).openByUserName("nagramxturbo", NekoAboutActivity.this, 1);
+        if (position == checkUpdateRow) {
+            Browser.openUrl(getParentActivity(), "tg://update");
+        } else if (position == releasesRow) {
+            Browser.openUrl(getParentActivity(), "https://github.com/privacyfreak84/NagramXTurbo-Plus/releases");
         } else if (position == sourceCodeRow) {
+            Browser.openUrl(getParentActivity(), "https://github.com/privacyfreak84/NagramXTurbo-Plus");
+        } else if (position == upstreamRow) {
             Browser.openUrl(getParentActivity(), "https://github.com/temporaryna/NagramXTurbo");
         } else if (position == datacenterStatusRow) {
             presentFragment(new DatacenterActivity(0));
@@ -95,12 +103,18 @@ public class NekoAboutActivity extends BaseNekoSettingsActivity {
                 });
                 logoHeaderCell.addView(logoImageView, LayoutHelper.createFrame(90, 90, Gravity.CENTER_HORIZONTAL, 0, 15, 0, 0));
                 TextView nameTextView = new TextView(mContext);
-                nameTextView.setText(getString(R.string.NagramX));
+                nameTextView.setText(getString(R.string.TurboPlusName));
                 nameTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22);
                 nameTextView.setTypeface(AndroidUtilities.bold());
                 nameTextView.setGravity(Gravity.CENTER);
                 nameTextView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
-                logoHeaderCell.addView(nameTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 16, 115, 16, 10));
+                logoHeaderCell.addView(nameTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 16, 115, 16, 0));
+                TextView taglineTextView = new TextView(mContext);
+                taglineTextView.setText(getString(R.string.TurboPlusTagline));
+                taglineTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+                taglineTextView.setGravity(Gravity.CENTER);
+                taglineTextView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2));
+                logoHeaderCell.addView(taglineTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 16, 146, 16, 16));
                 return new RecyclerListView.Holder(logoHeaderCell);
             }
             return super.onCreateViewHolder(parent, viewType);
@@ -110,12 +124,18 @@ public class NekoAboutActivity extends BaseNekoSettingsActivity {
         public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position, boolean partial) {
             if (holder.getItemViewType() == TYPE_SETTINGS) {
                 TextSettingsCell textCell = (TextSettingsCell) holder.itemView;
-                if (position == channelRow) {
-                    textCell.setTextAndValue(getString(R.string.TurboChannel), "@nagramxturbo", true);
+                if (position == checkUpdateRow) {
+                    textCell.setText(getString(R.string.CheckUpdate), true);
+                } else if (position == releasesRow) {
+                    textCell.setTextAndValue(getString(R.string.TurboReleases), "GitHub", true);
                 } else if (position == sourceCodeRow) {
                     textCell.setTextAndValue(getString(R.string.SourceCode), "GitHub", true);
+                } else if (position == upstreamRow) {
+                    textCell.setTextAndValue(getString(R.string.TurboUpstream), "temporaryna/NagramXTurbo", true);
                 } else if (position == versionRow) {
-                    textCell.setTextAndValue(getString(R.string.TurboVersion), BuildVars.BUILD_VERSION_STRING, false);
+                    String commit = BuildConfig.GIT_COMMIT;
+                    String version = BuildVars.BUILD_VERSION_STRING + (commit != null && commit.length() >= 7 ? " (" + commit.substring(0, 7) + ")" : "");
+                    textCell.setTextAndValue(getString(R.string.TurboVersion), version, true);
                 } else if (position == architectureRow) {
                     textCell.setTextAndValue(getString(R.string.TurboArchitecture), android.os.Build.SUPPORTED_ABIS[0].toLowerCase(java.util.Locale.ROOT), true);
                 } else if (position == datacenterStatusRow) {
