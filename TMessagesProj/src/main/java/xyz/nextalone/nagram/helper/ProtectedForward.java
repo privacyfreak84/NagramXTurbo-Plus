@@ -158,9 +158,13 @@ public class ProtectedForward {
         chatActivity.hideFieldPanel(false);
         int account = chatActivity.getCurrentAccount();
         ArrayList<CopySendQueue.CopySendQueueTarget> copySendTargets = buildCopySendTargets(account, dids);
-        int enqueueResult = CopySendQueue.getInstance(account).enqueue(chatActivity.getParentActivity(), messages, copySendTargets, comment, commentEntities, editableMessage, editedText != null ? editedText.toString() : null, editedEntities, notify, scheduleDate, scheduleRepeatPeriod);
-        if (enqueueResult == CopySendQueue.RESULT_SENT_NOW) {
-            chatActivity.showForwardedFeedback(dids, messages.size());
+        final int messageCount = messages.size();
+        int enqueueResult = CopySendQueue.getInstance(account).enqueue(chatActivity.getParentActivity(), messages, copySendTargets, comment, commentEntities, editableMessage, editedText != null ? editedText.toString() : null, editedEntities, notify, scheduleDate, scheduleRepeatPeriod,
+                () -> chatActivity.showForwardedFeedback(dids, messageCount));
+        // Queued copies (media that still has to be downloaded first) used to show nothing at all;
+        // give the same "forwarded" popup as an immediate send. A size-confirmation dialog shows it on accept.
+        if (enqueueResult == CopySendQueue.RESULT_SENT_NOW || enqueueResult == CopySendQueue.RESULT_QUEUED) {
+            chatActivity.showForwardedFeedback(dids, messageCount);
         } else if (enqueueResult == CopySendQueue.RESULT_FAILED_NOW) {
             BulletinFactory.of(chatActivity).createErrorBulletin(LocaleController.getString(R.string.PleaseDownload), chatActivity.getResourceProvider()).show();
         }
