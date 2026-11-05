@@ -619,7 +619,11 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
                 return false;
             }
             MessagesStorage.TopicKey selected = dids.get(0);
-            if (selected == null || selected.topicId != 0 || !isQuickShareDestinationEligible(selected.dialogId)) {
+            // Saved Messages is a valid forward-on-reaction target (the quick-share eligibility check excludes it
+            // only because that feature always offers it separately).
+            final long selfId = UserConfig.getInstance(UserConfig.selectedAccount).clientUserId;
+            final boolean isSaved = selected != null && selected.dialogId == selfId;
+            if (selected == null || selected.topicId != 0 || (!isSaved && !isQuickShareDestinationEligible(selected.dialogId))) {
                 showQuickShareInfo(getString(R.string.QuickShareDestinationNotAvailable));
                 return false;
             }
