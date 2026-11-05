@@ -51343,12 +51343,20 @@ public class ChatActivity extends BaseFragment implements
     }
 
     // ---- Forward messages that stay on screen long enough to Saved Messages ----
-    private static final long DWELL_FORWARD_TICK_MS = 400;
     private DwellForwardTracker dwellForwardTracker;
     private boolean dwellForwardScheduled;
     private boolean dwellForwardChatAllowed;
     private boolean dwellForwardScopeResolved;
     private final Runnable dwellForwardRunnable = this::dwellForwardTick;
+
+    private static long dwellForwardThresholdMs() {
+        return Math.max(100, NaConfig.INSTANCE.getDwellForwardMillis().Int());
+    }
+
+    /** Scan often enough that short thresholds (0.5 s) are not stretched by the polling interval. */
+    private static long dwellForwardTickMs() {
+        return Math.max(100, Math.min(400, dwellForwardThresholdMs() / 4));
+    }
 
     private boolean dwellForwardApplicable() {
         final long selfId = getUserConfig().getClientUserId();
@@ -51379,7 +51387,7 @@ public class ChatActivity extends BaseFragment implements
             dwellForwardTracker = new DwellForwardTracker(currentAccount, dialog_id);
         }
         dwellForwardScheduled = true;
-        AndroidUtilities.runOnUIThread(dwellForwardRunnable, DWELL_FORWARD_TICK_MS);
+        AndroidUtilities.runOnUIThread(dwellForwardRunnable, dwellForwardTickMs());
     }
 
     private void stopDwellForward() {
@@ -51438,7 +51446,7 @@ public class ChatActivity extends BaseFragment implements
                 }
             }
         }
-        final long thresholdMs = Math.max(1, NaConfig.INSTANCE.getDwellForwardSeconds().Int()) * 1000L;
+        final long thresholdMs = dwellForwardThresholdMs();
         List<Integer> due = dwellForwardTracker.update(visibleIds, SystemClock.elapsedRealtime(), thresholdMs);
         if (!due.isEmpty()) {
             forwardDwelledMessages(due, byId);
@@ -51466,9 +51474,16 @@ public class ChatActivity extends BaseFragment implements
         }
         final long selfId = getUserConfig().getClientUserId();
         ArrayList<MessageObject> all = new ArrayList<>(toSend.values());
+        boolean sentAny = false;
         for (int i = 0; i < all.size(); i += 100) {
             ArrayList<MessageObject> chunk = new ArrayList<>(all.subList(i, Math.min(all.size(), i + 100)));
-            getSendMessagesHelper().sendMessage(chunk, selfId, false, false, false, 0, 0, null, -1, 0, 0L, null);
+            sentAny |= getSendMessagesHelper().sendMessage(chunk, selfId, false, false, false, 0, 0, null, -1, 0, 0L, null) == 0;
+        }
+        if (sentAny) {
+            // same "Forwarded to Saved Messages" popup as a manual save
+            ArrayList<MessagesStorage.TopicKey> target = new ArrayList<>();
+            target.add(MessagesStorage.TopicKey.of(selfId, 0));
+            showForwardedFeedback(target, all.size());
         }
         // mark even on failure so a rejected message is not retried forever
         dwellForwardTracker.markForwarded(dueIds);
