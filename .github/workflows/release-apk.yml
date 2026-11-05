@@ -1,0 +1,36 @@
+name: Release APK from run
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+      tag:
+        required: true
+      sha:
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n Staging -D out
+          find out -type f
+          cat > notes.md <<'NOTES'
+          - Quick-reaction forwarding can now target Saved Messages (pick it in the forward destination picker).
+          - Reworked About screen for this fork: Check for Updates row, Releases and Source Code links to this repo, an upstream credit, and the build commit next to the version.
+          - Manual "Check for Updates" now runs even when automatic update checks are switched off.
+          - Signed with the fork's stable key (certificate SHA-256 A5:17:D9:FB:…:D0:5B:CA:7E), same as v13.1.1-plus-signed-20261105, so this installs over it without uninstalling.
+
+          Built by CI from commit 19d203c. CI proves it compiles and packages; features were not tested by CI.
+          NOTES
+          APKS=$(find out -name '*.apk')
+          gh release create "$TAG" $APKS -R "$GITHUB_REPOSITORY" --target "$SHA" --title "NagramXTurbo-Plus $TAG" --notes-file notes.md
