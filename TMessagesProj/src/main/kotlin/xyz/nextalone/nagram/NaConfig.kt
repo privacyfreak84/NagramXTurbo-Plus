@@ -190,6 +190,17 @@ object NaConfig {
         addConfig("QuickReactionForwardEnabled", ConfigItem.configTypeBool, false)
     val quickReactionForwardDestinationId =
         addConfig("QuickReactionForwardDestinationId", ConfigItem.configTypeString, "")
+    val dwellForwardEnabled =
+        addConfig("DwellForwardEnabled", ConfigItem.configTypeBool, false)
+    val dwellForwardSeconds =
+        addConfig("DwellForwardSeconds", ConfigItem.configTypeInt, 5)
+    // 0 = all channels (default), 1 = only chats picked in DwellForwardIncludeIds, 2 = all chats
+    val dwellForwardScope =
+        addConfig("DwellForwardScope", ConfigItem.configTypeInt, 0)
+    val dwellForwardIncludeIds =
+        addConfig("DwellForwardIncludeIds", ConfigItem.configTypeString, "")
+    val dwellForwardExcludeIds =
+        addConfig("DwellForwardExcludeIds", ConfigItem.configTypeString, "")
     val showNoQuoteForward =
         addConfig(
             "NoQuoteForward",
