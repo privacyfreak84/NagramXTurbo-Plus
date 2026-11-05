@@ -1,0 +1,37 @@
+name: Release APK from run
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+      tag:
+        required: true
+      sha:
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n Staging -D out
+          find out -type f
+          cat > notes.md <<'NOTES'
+          NagramXTurbo-Plus 13.1.1, first build signed with the fork's own stable key.
+
+          - Signing certificate SHA-256: A5:17:D9:FB:AD:55:CC:12:AF:F1:CD:93:34:99:F7:50:8F:FE:EA:4B:FC:ED:31:88:53:54:93:80:D0:5B:CA:7E
+          - Earlier releases used a different throwaway key each time, so Android will not install this over them: uninstall the old app once first (local data such as secret chats is lost). Builds signed with the same key can be installed over this one.
+          - Same code as v13.1.1-plus-20261103; only the signing changed.
+
+          Built by CI from commit 645224c. CI proves it compiles and packages; features were not tested by CI.
+          NOTES
+          APKS=$(find out -name '*.apk')
+          gh release create "$TAG" $APKS -R "$GITHUB_REPOSITORY" --target "$SHA" --title "NagramXTurbo-Plus $TAG" --notes-file notes.md
