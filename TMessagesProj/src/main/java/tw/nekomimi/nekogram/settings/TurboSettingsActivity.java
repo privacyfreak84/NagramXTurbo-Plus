@@ -209,6 +209,17 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
             getString(R.string.QuickReactionForwardDestination),
             value -> quickReactionForwardSummary(value),
             null, null, null));
+    private final AbstractConfigCell dwellForwardEnabledRow = cellGroup.appendCell(new ConfigCellTextCheck(NaConfig.INSTANCE.getDwellForwardEnabled(), getString(R.string.DwellForwardEnabledAbout)));
+    private final AbstractConfigCell dwellForwardSecondsRow = cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getDwellForwardSeconds(), new String[]{
+            LocaleController.formatPluralString("Seconds", 1),
+            LocaleController.formatPluralString("Seconds", 2),
+            LocaleController.formatPluralString("Seconds", 3),
+            LocaleController.formatPluralString("Seconds", 5),
+            LocaleController.formatPluralString("Seconds", 10),
+            LocaleController.formatPluralString("Seconds", 15),
+            LocaleController.formatPluralString("Seconds", 30),
+            LocaleController.formatPluralString("Seconds", 60)
+    }, new int[]{1, 2, 3, 5, 10, 15, 30, 60}, null));
     private final AbstractConfigCell forwardProtectedModeRow = BuildVars.TURBO_BASE ? null : cellGroup.appendCell(new ConfigCellSelectBox(null, NaConfig.INSTANCE.getForwardProtectedMode(), new String[]{
             getString(R.string.ForwardProtectedModeAsk),
             getString(R.string.ForwardProtectedModeAlways),

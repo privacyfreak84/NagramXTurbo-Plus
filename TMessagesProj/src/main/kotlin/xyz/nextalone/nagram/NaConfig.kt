@@ -190,6 +190,10 @@ object NaConfig {
         addConfig("QuickReactionForwardEnabled", ConfigItem.configTypeBool, false)
     val quickReactionForwardDestinationId =
         addConfig("QuickReactionForwardDestinationId", ConfigItem.configTypeString, "")
+    val dwellForwardEnabled =
+        addConfig("DwellForwardEnabled", ConfigItem.configTypeBool, false)
+    val dwellForwardSeconds =
+        addConfig("DwellForwardSeconds", ConfigItem.configTypeInt, 5)
     val showNoQuoteForward =
         addConfig(
             "NoQuoteForward",

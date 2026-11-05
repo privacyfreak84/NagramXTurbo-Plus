@@ -399,6 +399,7 @@ import tw.nekomimi.nekogram.filters.AyuFilter;
 import tw.nekomimi.nekogram.filters.ReactionFilter;
 import tw.nekomimi.nekogram.filters.RegexFilterEditActivity;
 import tw.nekomimi.nekogram.helpers.ChatsHelper;
+import tw.nekomimi.nekogram.helpers.DwellForwardTracker;
 import tw.nekomimi.nekogram.helpers.MessageHelper;
 import tw.nekomimi.nekogram.helpers.TranscribeHelper;
 import tw.nekomimi.nekogram.helpers.remote.EmojiHelper;
@@ -3734,6 +3735,7 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        stopDwellForward();
         if (messageMetricsView != null) {
             messageMetricsView.finish();
         }
@@ -31835,6 +31837,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         paused = false;
+        startDwellForward();
         pausedOnLastMessage = false;
         checkScrollForLoad(false);
         if (wasPaused) {
@@ -31960,6 +31963,7 @@ public class ChatActivity extends BaseFragment implements
         MediaController.getInstance().stopRaiseToEarSensors(this, true, true);
         paused = true;
         wasPaused = true;
+        stopDwellForward();
         if (chatMode == 0) {
             getNotificationsController().setOpenedDialogId(0, 0);
         }
@@ -51335,6 +51339,126 @@ public class ChatActivity extends BaseFragment implements
         sponsoredAbout.addView(infoText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL));
 
         return sponsoredAbout;
+    }
+
+    // ---- Forward messages that stay on screen long enough to Saved Messages ----
+    private static final long DWELL_FORWARD_TICK_MS = 400;
+    private DwellForwardTracker dwellForwardTracker;
+    private boolean dwellForwardScheduled;
+    private final Runnable dwellForwardRunnable = this::dwellForwardTick;
+
+    private boolean dwellForwardApplicable() {
+        final long selfId = getUserConfig().getClientUserId();
+        return NaConfig.INSTANCE.getDwellForwardEnabled().Bool()
+                && !paused
+                && chatMode == 0
+                && !inPreviewMode
+                && selfId != 0
+                && dialog_id != 0
+                && dialog_id != selfId
+                && !DialogObject.isEncryptedDialog(dialog_id)
+                && !isPeerNoForwards();
+    }
+
+    private void startDwellForward() {
+        if (dwellForwardScheduled || !dwellForwardApplicable()) {
+            return;
+        }
+        if (dwellForwardTracker == null) {
+            dwellForwardTracker = new DwellForwardTracker(currentAccount, dialog_id);
+        }
+        dwellForwardScheduled = true;
+        AndroidUtilities.runOnUIThread(dwellForwardRunnable, DWELL_FORWARD_TICK_MS);
+    }
+
+    private void stopDwellForward() {
+        dwellForwardScheduled = false;
+        AndroidUtilities.cancelRunOnUIThread(dwellForwardRunnable);
+        if (dwellForwardTracker != null) {
+            dwellForwardTracker.reset();
+        }
+    }
+
+    private boolean dwellForwardEligible(MessageObject message) {
+        if (message == null || message.messageOwner == null || message.getId() <= 0 || message.isOut() || message.isSponsored()) {
+            return false;
+        }
+        if (message.messageOwner instanceof TLRPC.TL_messageService || message.getDialogId() != dialog_id) {
+            return false;
+        }
+        if (message.isSecretMedia() || message.isVoiceOnce() || message.isRoundOnce()) {
+            return false; // view-once / self-destructing content is never copied
+        }
+        return message.canForwardMessage() && !dwellForwardTracker.isForwarded(message.getId());
+    }
+
+    private void dwellForwardTick() {
+        dwellForwardScheduled = false;
+        if (paused || dwellForwardTracker == null || !NaConfig.INSTANCE.getDwellForwardEnabled().Bool()) {
+            return;
+        }
+        HashSet<Integer> visibleIds = new HashSet<>();
+        HashMap<Integer, MessageObject> byId = new HashMap<>();
+        if (dwellForwardApplicable() && chatListView != null && !BaseFragment.hasSheets(this)) {
+            final float clipTop = chatListViewPaddingTop;
+            final float clipBottom = chatListView.getMeasuredHeight() - blurredViewBottomOffset;
+            final float viewport = clipBottom - clipTop;
+            if (viewport > 0) {
+                for (int a = 0, count = chatListView.getChildCount(); a < count; a++) {
+                    View child = chatListView.getChildAt(a);
+                    if (!(child instanceof ChatMessageCell)) {
+                        continue;
+                    }
+                    MessageObject message = ((ChatMessageCell) child).getMessageObject();
+                    final float height = child.getMeasuredHeight();
+                    if (height <= 0 || !dwellForwardEligible(message)) {
+                        continue;
+                    }
+                    final float top = child.getY();
+                    final float shown = Math.min(top + height, clipBottom) - Math.max(top, clipTop);
+                    // "seen" = most of the message (or most of the screen, for tall ones) is visible
+                    if (shown >= 0.6f * Math.min(height, viewport)) {
+                        visibleIds.add(message.getId());
+                        byId.put(message.getId(), message);
+                    }
+                }
+            }
+        }
+        final long thresholdMs = Math.max(1, NaConfig.INSTANCE.getDwellForwardSeconds().Int()) * 1000L;
+        List<Integer> due = dwellForwardTracker.update(visibleIds, SystemClock.elapsedRealtime(), thresholdMs);
+        if (!due.isEmpty()) {
+            forwardDwelledMessages(due, byId);
+        }
+        startDwellForward();
+    }
+
+    private void forwardDwelledMessages(List<Integer> dueIds, Map<Integer, MessageObject> byId) {
+        java.util.TreeMap<Integer, MessageObject> toSend = new java.util.TreeMap<>();
+        for (Integer id : dueIds) {
+            MessageObject message = byId.get(id);
+            if (message == null) {
+                continue;
+            }
+            MessageObject.GroupedMessages group = message.getGroupId() != 0 ? groupedMessagesMap.get(message.getGroupId()) : null;
+            if (group != null) {
+                for (MessageObject groupMessage : group.messages) { // keep albums together
+                    if (groupMessage.getId() > 0 && groupMessage.canForwardMessage()) {
+                        toSend.put(groupMessage.getId(), groupMessage);
+                    }
+                }
+            } else {
+                toSend.put(id, message);
+            }
+        }
+        final long selfId = getUserConfig().getClientUserId();
+        ArrayList<MessageObject> all = new ArrayList<>(toSend.values());
+        for (int i = 0; i < all.size(); i += 100) {
+            ArrayList<MessageObject> chunk = new ArrayList<>(all.subList(i, Math.min(all.size(), i + 100)));
+            getSendMessagesHelper().sendMessage(chunk, selfId, false, false, false, 0, 0, null, -1, 0, 0L, null);
+        }
+        // mark even on failure so a rejected message is not retried forever
+        dwellForwardTracker.markForwarded(dueIds);
+        dwellForwardTracker.markForwarded(toSend.keySet());
     }
 
     public boolean isPeerNoForwards() {
