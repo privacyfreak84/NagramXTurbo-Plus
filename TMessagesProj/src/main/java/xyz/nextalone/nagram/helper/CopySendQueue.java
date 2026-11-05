@@ -53,6 +53,8 @@ public class CopySendQueue implements NotificationCenter.NotificationCenterDeleg
     public static final int RESULT_QUEUED = 0;
     public static final int RESULT_SENT_NOW = 1;
     public static final int RESULT_FAILED_NOW = 2;
+    /** A size-confirmation dialog is showing; nothing is queued until the user accepts it. */
+    public static final int RESULT_AWAITING_CONFIRMATION = 3;
 
     private static final SparseArrayCompat<CopySendQueue> instanceByAccount = new SparseArrayCompat<>();
 
@@ -135,6 +137,17 @@ public class CopySendQueue implements NotificationCenter.NotificationCenterDeleg
                        CharSequence comment, ArrayList<TLRPC.MessageEntity> commentEntities,
                        MessageObject editableMessage, String editedText, ArrayList<TLRPC.MessageEntity> editedEntities,
                        boolean withSound, int scheduleDate, int scheduleRepeatPeriod) {
+        return enqueue(activity, sourceMessages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, null);
+    }
+
+    /**
+     * @param onAccepted run after the user accepts the size-confirmation dialog (only used when the
+     *                   result is {@link #RESULT_AWAITING_CONFIRMATION}), e.g. to show the "forwarded" popup
+     */
+    public int enqueue(Activity activity, ArrayList<MessageObject> sourceMessages, ArrayList<CopySendQueueTarget> targets,
+                       CharSequence comment, ArrayList<TLRPC.MessageEntity> commentEntities,
+                       MessageObject editableMessage, String editedText, ArrayList<TLRPC.MessageEntity> editedEntities,
+                       boolean withSound, int scheduleDate, int scheduleRepeatPeriod, Runnable onAccepted) {
         if (sourceMessages == null || sourceMessages.isEmpty() || targets == null || targets.isEmpty()) {
             return RESULT_FAILED_NOW;
         }
@@ -149,8 +162,8 @@ public class CopySendQueue implements NotificationCenter.NotificationCenterDeleg
             return sendToTargets(messages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, null);
         }
         if (totalPendingBytes > COPY_SEND_CONFIRM_THRESHOLD_BYTES) {
-            showConfirmDialog(activity, messages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, pendingDocuments, pendingPhotos, totalPendingBytes);
-            return RESULT_QUEUED;
+            showConfirmDialog(activity, messages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, pendingDocuments, pendingPhotos, totalPendingBytes, onAccepted);
+            return activity == null ? RESULT_QUEUED : RESULT_AWAITING_CONFIRMATION;
         }
         enqueueJob(messages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, pendingDocuments, pendingPhotos);
         return RESULT_QUEUED;
@@ -160,15 +173,20 @@ public class CopySendQueue implements NotificationCenter.NotificationCenterDeleg
                                    CharSequence comment, ArrayList<TLRPC.MessageEntity> commentEntities,
                                    MessageObject editableMessage, String editedText, ArrayList<TLRPC.MessageEntity> editedEntities,
                                    boolean withSound, int scheduleDate, int scheduleRepeatPeriod,
-                                   LinkedHashMap<String, Long> pendingDocuments, ArrayList<MessageObject> pendingPhotos, long totalPendingBytes) {
+                                   LinkedHashMap<String, Long> pendingDocuments, ArrayList<MessageObject> pendingPhotos, long totalPendingBytes,
+                                   Runnable onAccepted) {
         if (activity == null) {
             enqueueJob(messages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, pendingDocuments, pendingPhotos);
             return;
         }
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
         builder.setMessage(LocaleController.formatString(R.string.CopySendConfirmSize, AndroidUtilities.formatFileSize(totalPendingBytes)));
-        builder.setPositiveButton(LocaleController.getString(R.string.CopySendConfirmAction), (dialog, which) ->
-                enqueueJob(messages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, pendingDocuments, pendingPhotos));
+        builder.setPositiveButton(LocaleController.getString(R.string.CopySendConfirmAction), (dialog, which) -> {
+            enqueueJob(messages, targets, comment, commentEntities, editableMessage, editedText, editedEntities, withSound, scheduleDate, scheduleRepeatPeriod, pendingDocuments, pendingPhotos);
+            if (onAccepted != null) {
+                onAccepted.run();
+            }
+        });
         builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
         builder.show();
     }
