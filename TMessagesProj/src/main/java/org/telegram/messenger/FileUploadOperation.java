@@ -25,6 +25,7 @@ import java.io.FileDescriptor;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import tw.nekomimi.nekogram.NekoConfig;
 
@@ -40,14 +41,18 @@ public class FileUploadOperation {
     private boolean nextPartFirst;
     private int operationGuid;
     private static final int minUploadChunkSize = 128;
+    // Big files use the largest part the server accepts: each part costs roughly fixed time on the server.
+    private static final int minUploadChunkSizeBig = 512;
     private static final int minUploadChunkSizeBoost = 512;
     private static final int minUploadChunkSlowNetworkSize = 32;
     private static final int initialRequestsCount = 8;
     private static final int initialRequestsSlowNetworkCount = 1;
-    private static final int maxUploadingKBytes = 1024 * 2;
+    private static final int maxUploadingKBytes = 1024 * 8;
     private static final int maxUploadingSlowNetworkKBytes = 32;
 
     private int maxRequestsCount;
+    private int uploadConnectionsCount = 4;
+    private final int[] uploadRequestsPerConnection = new int[ConnectionsManager.UploadConnectionsCountPremium];
     private int uploadChunkSize = 64 * 1024;
     private boolean slowNetwork;
     private ArrayList<byte[]> freeRequestIvs;
@@ -85,7 +90,11 @@ public class FileUploadOperation {
     private boolean uploadFirstPartLater;
     private SparseArray<UploadCachedResult> cachedResults = new SparseArray<>();
     private boolean[] recalculatedEstimatedSize = {false, false};
+    // Upstream field: ImageLoader throttles UI progress notifications on it with SystemClock.elapsedRealtime().
+    // The stall watchdog below uses its own lastUploadActivityTime (wall clock) and must never write here,
+    // or the mixed time bases suppress every mid-upload progress tick.
     protected volatile long lastProgressUpdateTime;
+    private volatile long lastUploadActivityTime;
     protected volatile long lastDataAvailableTime;
     private boolean streamingConversion;
     private int chunkLogCounter;
@@ -121,8 +130,8 @@ public class FileUploadOperation {
             return;
         }
         state = 1;
-        lastProgressUpdateTime = System.currentTimeMillis();
-        lastDataAvailableTime = lastProgressUpdateTime;
+        lastUploadActivityTime = System.currentTimeMillis();
+        lastDataAvailableTime = lastUploadActivityTime;
         AndroidUtilities.runOnUIThread(uploadStallCheck, UPLOAD_STALL_DETECT_MS);
         AutoDeleteMediaTask.lockFile(uploadingFilePath);
         Utilities.stageQueue.postRunnable(() -> {
@@ -134,7 +143,20 @@ public class FileUploadOperation {
             for (int a = 0, count = (slowNetwork ? initialRequestsSlowNetworkCount : initialRequestsCount); a < count; a++) {
                 startUploadRequest();
             }
+            startUploadRequests();
         });
+    }
+
+    // Keeps the whole budget in flight. Parts used to be added one per answer, plus one per
+    // socket write, which is rarely reported, so uploads stayed at the initial request count.
+    private void startUploadRequests() {
+        while (state == 1 && currentUploadRequetsCount < maxRequestsCount) {
+            int count = currentUploadRequetsCount;
+            startUploadRequest();
+            if (currentUploadRequetsCount == count) {
+                break;
+            }
+        }
     }
 
     protected void onNetworkChanged(final boolean slow) {
@@ -163,6 +185,7 @@ public class FileUploadOperation {
                 iv = null;
                 ivChange = null;
                 currentUploadRequetsCount = 0;
+                Arrays.fill(uploadRequestsPerConnection, 0);
                 lastSavedPartNum = 0;
                 uploadFirstPartLater = false;
                 cachedResults.clear();
@@ -331,7 +354,7 @@ public class FileUploadOperation {
                 if (AccountInstance.getInstance(currentAccount).getUserConfig().isPremium() && totalFileSize > FileLoader.DEFAULT_MAX_FILE_SIZE) {
                     maxUploadParts = MessagesController.getInstance(currentAccount).uploadMaxFilePartsPremium;
                 }
-                uploadChunkSize = (int) Math.max(slowNetwork ? minUploadChunkSlowNetworkSize : NekoConfig.uploadBoost.Bool() ? minUploadChunkSizeBoost : minUploadChunkSize, (totalFileSize + 1024L * maxUploadParts - 1) / (1024L * maxUploadParts));
+                uploadChunkSize = (int) Math.max(slowNetwork ? minUploadChunkSlowNetworkSize : NekoConfig.uploadBoost.Bool() ? minUploadChunkSizeBoost : isBigFile ? minUploadChunkSizeBig : minUploadChunkSize, (totalFileSize + 1024L * maxUploadParts - 1) / (1024L * maxUploadParts));
                 if (1024 % uploadChunkSize != 0) {
                     int chunkSize = 64;
                     while (uploadChunkSize > chunkSize) {
@@ -340,6 +363,8 @@ public class FileUploadOperation {
                     uploadChunkSize = chunkSize;
                 }
                 maxRequestsCount = Math.max(1, (slowNetwork ? maxUploadingSlowNetworkKBytes : maxUploadingKBytes) / uploadChunkSize);
+                // TDLib uploads premium files over 8 sessions.
+                uploadConnectionsCount = AccountInstance.getInstance(currentAccount).getUserConfig().isPremium() ? ConnectionsManager.UploadConnectionsCountPremium : 4;
 
                 if (isEncrypted) {
                     freeRequestIvs = new ArrayList<>(maxRequestsCount);
@@ -565,16 +590,27 @@ public class FileUploadOperation {
         if (slowNetwork) {
             connectionType = ConnectionsManager.ConnectionTypeUpload;
         } else {
-            connectionType = ConnectionsManager.ConnectionTypeUpload | ((requestNumFinal % 4) << 16);
+            // Like TDLib's SessionMultiProxy: the connection with the fewest parts in flight, so a slow
+            // connection gets fewer parts instead of every Nth one holding up the whole upload.
+            int connectionNum = requestNumFinal % uploadConnectionsCount;
+            for (int a = 1; a < uploadConnectionsCount; a++) {
+                int num = (requestNumFinal + a) % uploadConnectionsCount;
+                if (uploadRequestsPerConnection[num] < uploadRequestsPerConnection[connectionNum]) {
+                    connectionNum = num;
+                }
+            }
+            connectionType = ConnectionsManager.ConnectionTypeUpload | (connectionNum << 16);
         }
-        long time = System.currentTimeMillis();
-        lastProgressUpdateTime = time;
+        final int requestConnectionNum = connectionType >> 16;
+        uploadRequestsPerConnection[requestConnectionNum]++;
+        lastUploadActivityTime = System.currentTimeMillis();
         int[] requestToken = new int[1];
         requestToken[0] = ConnectionsManager.getInstance(currentAccount).sendRequest(finalRequest, (response, error) -> {
             if (currentOperationGuid != operationGuid) {
                 return;
             }
-            lastProgressUpdateTime = System.currentTimeMillis();
+            uploadRequestsPerConnection[requestConnectionNum]--;
+            lastUploadActivityTime = System.currentTimeMillis();
             if (BuildVars.LOGS_ENABLED) {
                 FileLog.d("debug_uploading: " + " response reqId " + requestToken[0] + " time" + uploadingFilePath);
             }
@@ -689,7 +725,7 @@ public class FileUploadOperation {
                         }
                         saveInfoTimes++;
                     }
-                    startUploadRequest();
+                    startUploadRequests();
                 }
             } else {
                 if (state != 1) {
@@ -700,10 +736,8 @@ public class FileUploadOperation {
                 cleanup();
             }
         }, null, () -> Utilities.stageQueue.postRunnable(() -> {
-            lastProgressUpdateTime = System.currentTimeMillis();
-            if (currentUploadRequetsCount < maxRequestsCount) {
-                startUploadRequest();
-            }
+            lastUploadActivityTime = System.currentTimeMillis();
+            startUploadRequests();
         }), forceSmallFile ? ConnectionsManager.RequestFlagCanCompress : 0, ConnectionsManager.DEFAULT_DATACENTER_ID, connectionType, true);
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("debug_uploading: " + " send reqId " + requestToken[0] + " " + uploadingFilePath + " file_part=" + currentRequestPartNum + " isBig=" + isBigFile + " file_id=" + currentFileId);
@@ -740,11 +774,11 @@ public class FileUploadOperation {
                 caughtPremiumFloodWait = false;
                 premiumFloodWaitChecks = 0;
             } else {
-                lastProgressUpdateTime = now;
+                lastUploadActivityTime = now;
             }
             stalled = false;
         } else {
-            stalled = currentUploadRequetsCount > 0 && now - lastProgressUpdateTime > UPLOAD_STALL_DETECT_MS;
+            stalled = currentUploadRequetsCount > 0 && now - lastUploadActivityTime > UPLOAD_STALL_DETECT_MS;
         }
         if (streamingConversion && !caughtPremiumFloodWait && currentUploadRequetsCount == 0 && now - lastDataAvailableTime > UPLOAD_CONVERSION_STALL_MS) {
             if (BuildVars.LOGS_ENABLED) {
@@ -773,7 +807,7 @@ public class FileUploadOperation {
             }
             restartStalledUpload(UPLOAD_STALL_RESTART_DELAY_MS << (uploadStallRestarts - 1));
         } else if (BuildVars.LOGS_ENABLED && (streamingConversion || currentUploadRequetsCount > 0)) {
-            FileLog.d("debug_uploading: stall check ok requests=" + currentUploadRequetsCount + " progressAge=" + (now - lastProgressUpdateTime) + "ms chunkAge=" + (now - lastDataAvailableTime) + "ms floodWait=" + caughtPremiumFloodWait + " " + uploadingFilePath);
+            FileLog.d("debug_uploading: stall check ok requests=" + currentUploadRequetsCount + " progressAge=" + (now - lastUploadActivityTime) + "ms chunkAge=" + (now - lastDataAvailableTime) + "ms floodWait=" + caughtPremiumFloodWait + " " + uploadingFilePath);
         }
         AndroidUtilities.runOnUIThread(uploadStallCheck, UPLOAD_STALL_DETECT_MS);
     }
@@ -800,7 +834,7 @@ public class FileUploadOperation {
         uploadFirstPartLater = false;
         cachedResults.clear();
         operationGuid++;
-        lastProgressUpdateTime = System.currentTimeMillis();
+        lastUploadActivityTime = System.currentTimeMillis();
         Utilities.stageQueue.postRunnable(() -> {
             if (state != 1) {
                 return;

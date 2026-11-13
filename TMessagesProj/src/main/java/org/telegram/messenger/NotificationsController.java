@@ -102,6 +102,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 import tw.nekomimi.nekogram.NekoConfig;
+import tw.nekomimi.nekogram.helpers.HiddenChatsHelper;
 import tw.nekomimi.nekogram.NekoXConfig;
 import tw.nekomimi.nekogram.filters.AyuFilter;
 import xyz.nextalone.nagram.NaConfig;
@@ -111,7 +112,7 @@ public class NotificationsController extends BaseController implements Notificat
     public static final String EXTRA_VOICE_REPLY = "extra_voice_reply";
     public static String OTHER_NOTIFICATIONS_CHANNEL = null;
 
-    private static final DispatchQueue notificationsQueue = new DispatchQueue("notificationsQueue");
+    private static final DispatchQueue2 notificationsQueue = new DispatchQueue2("notificationsQueue");
     private final ArrayList<MessageObject> pushMessages = new ArrayList<>();
     private final ArrayList<MessageObject> delayedPushMessages = new ArrayList<>();
     private final LongSparseArray<SparseArray<MessageObject>> pushMessagesDict = new LongSparseArray<>();
@@ -297,8 +298,17 @@ public class NotificationsController extends BaseController implements Notificat
             OTHER_NOTIFICATIONS_CHANNEL = "Other" + Utilities.random.nextLong();
             preferences.edit().putString("OtherKey", OTHER_NOTIFICATIONS_CHANNEL).commit();
         }
+        final String channelName = LocaleController.getString(R.string.InternalNotificationsSystemSetting);
+        if (notificationChannel != null && !TextUtils.equals(notificationChannel.getName(), channelName)) {
+            notificationChannel.setName(channelName);
+            try {
+                systemNotificationManager.createNotificationChannel(notificationChannel);
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
         if (notificationChannel == null) {
-            notificationChannel = new NotificationChannel(OTHER_NOTIFICATIONS_CHANNEL, "Internal notifications", NotificationManager.IMPORTANCE_DEFAULT);
+            notificationChannel = new NotificationChannel(OTHER_NOTIFICATIONS_CHANNEL, channelName, NotificationManager.IMPORTANCE_DEFAULT);
             notificationChannel.enableLights(false);
             notificationChannel.enableVibration(false);
             notificationChannel.setSound(null, null);
@@ -1158,6 +1168,18 @@ public class NotificationsController extends BaseController implements Notificat
                 if (!messageObject.isOauthPush && !BuildVars.TURBO_BASE && AyuFilter.isFiltered(messageObject, null)) {
                     continue;
                 }
+                if (HiddenChatsHelper.shouldSuppressNotification(currentAccount, messageObject.getDialogId())) {
+                    continue;
+                }
+                if (HiddenChatsHelper.shouldMaskNotificationContent(currentAccount, messageObject.getDialogId())) {
+                    String hiddenName = LocaleController.getString(R.string.NotificationHiddenChatName);
+                    messageObject.localName = hiddenName;
+                    messageObject.localUserName = hiddenName;
+                } else if (HiddenChatsHelper.shouldAliasNotification(currentAccount, messageObject.getDialogId())) {
+                    String alias = HiddenChatsHelper.getAliasFor(currentAccount, messageObject.getDialogId());
+                    messageObject.localName = alias;
+                    messageObject.localUserName = alias;
+                }
                 if (messageObject.isStoryPush) {
                     long date = messageObject.messageOwner == null ? System.currentTimeMillis() : messageObject.messageOwner.date * 1000L;
                     long dialogId = messageObject.getDialogId();
@@ -1820,6 +1842,9 @@ public class NotificationsController extends BaseController implements Notificat
                         final ArrayList<TLRPC.Dialog> dialogs = new ArrayList<>(MessagesController.getInstance(a).allDialogs);
                         for (int i = 0, N = dialogs.size(); i < N; i++) {
                             TLRPC.Dialog dialog = dialogs.get(i);
+                            if (dialog != null && HiddenChatsHelper.isInvisibleDialog(currentAccount, dialog.id)) {
+                                continue;
+                            }
                             if (dialog != null && DialogObject.isChatDialog(dialog.id)) {
                                 TLRPC.Chat chat = getMessagesController().getChat(-dialog.id);
                                 if (ChatObject.isNotInChat(chat) || ChatObject.isCommunity(chat)) {
@@ -1841,6 +1866,9 @@ public class NotificationsController extends BaseController implements Notificat
                     try {
                         for (int i = 0, N = MessagesController.getInstance(a).allDialogs.size(); i < N; i++) {
                             TLRPC.Dialog dialog = MessagesController.getInstance(a).allDialogs.get(i);
+                            if (dialog != null && HiddenChatsHelper.isInvisibleDialog(currentAccount, dialog.id)) {
+                                continue;
+                            }
                             if (DialogObject.isChatDialog(dialog.id)) {
                                 TLRPC.Chat chat = getMessagesController().getChat(-dialog.id);
                                 if (ChatObject.isNotInChat(chat) || ChatObject.isCommunity(chat)) {
@@ -1883,6 +1911,12 @@ public class NotificationsController extends BaseController implements Notificat
 
     public String getShortStringForMessage(MessageObject messageObject, String[] userName, boolean[] preview) {
         if (shouldHideNotificationContentForPasscode()) {
+            return LocaleController.getString(R.string.NotificationHiddenMessage);
+        }
+        if (HiddenChatsHelper.shouldMaskNotificationContent(currentAccount, messageObject.messageOwner.dialog_id)) {
+            if (preview != null) {
+                preview[0] = false;
+            }
             return LocaleController.getString(R.string.NotificationHiddenMessage);
         }
         long dialogId = messageObject.messageOwner.dialog_id;
@@ -2490,6 +2524,12 @@ public class NotificationsController extends BaseController implements Notificat
                         }
                     } else if (messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaToDo) {
                         return LocaleController.getString(R.string.Todo);
+                    } else if (messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaWidget) {
+                        // The caption, or "Widget" for a widget sent without one.
+                        if (TextUtils.isEmpty(messageObject.messageOwner.message)) {
+                            return LocaleController.getString(R.string.AttachWidget);
+                        }
+                        return replaceSpoilers(messageObject);
                     } else if (messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaGiveaway) {
                         return LocaleController.getString(R.string.BoostingGiveaway);
                     } else if (messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaGiveawayResults) {
@@ -2573,6 +2613,12 @@ public class NotificationsController extends BaseController implements Notificat
 
     private String getStringForMessage(MessageObject messageObject, boolean shortMessage, boolean[] text, boolean[] preview) {
         if (shouldHideNotificationContentForPasscode()) {
+            return LocaleController.getString(R.string.YouHaveNewMessage);
+        }
+        if (HiddenChatsHelper.shouldMaskNotificationContent(currentAccount, messageObject.messageOwner.dialog_id)) {
+            if (preview != null) {
+                preview[0] = false;
+            }
             return LocaleController.getString(R.string.YouHaveNewMessage);
         }
         if (messageObject.isStoryPush || messageObject.isStoryMentionPush) {
@@ -3682,7 +3728,7 @@ public class NotificationsController extends BaseController implements Notificat
 
     @SuppressLint("RestrictedApi")
     private String createNotificationShortcut(NotificationCompat.Builder builder, long did, String name, TLRPC.User user, TLRPC.Chat chat, Person person, boolean supportsBubble) {
-        if (unsupportedNotificationShortcut() || ChatObject.isChannel(chat) && !chat.megagroup) {
+        if (unsupportedNotificationShortcut() || HiddenChatsHelper.isHidden(currentAccount, did) || ChatObject.isChannel(chat) && !chat.megagroup) {
             return null;
         }
         try {
@@ -4919,6 +4965,7 @@ public class NotificationsController extends BaseController implements Notificat
         if (Build.VERSION.SDK_INT >= 26) {
             notificationBuilder.setChannelId(validateChannelId(lastDialogId, lastTopicId, chatName, vibrationPattern, ledColor, sound, importance, isDefault, isInApp, isSilent, chatType));
         }
+        notificationBuilder.setOnlyAlertOnce(isSilent);
         Notification mainNotification = notificationBuilder.build();
         if (Build.VERSION.SDK_INT <= 19) {
             notificationManager.notify(notificationId, mainNotification);
@@ -5083,6 +5130,9 @@ public class NotificationsController extends BaseController implements Notificat
                 }
             } else if (!DialogObject.isEncryptedDialog(dialogId)) {
                 canReply = (lastMessageObject != null && !lastMessageObject.isReactionPush && !lastMessageObject.isStoryReactionPush) && dialogId != 777000;
+                if (canReply && HiddenChatsHelper.shouldMaskNotificationContent(currentAccount, dialogId)) {
+                    canReply = false;
+                }
                 if (DialogObject.isUserDialog(dialogId)) {
                     user = getMessagesController().getUser(dialogId);
                     if (user == null) {
@@ -5676,6 +5726,7 @@ public class NotificationsController extends BaseController implements Notificat
                     .setStyle(messagingStyle)
                     .setContentIntent(contentIntent)
                     .setSortKey(String.valueOf(Long.MAX_VALUE - date))
+                    .setOnlyAlertOnce(isSilent || dialogId != lastDialogId || topicId != lastTopicId)
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE);
 
             try {

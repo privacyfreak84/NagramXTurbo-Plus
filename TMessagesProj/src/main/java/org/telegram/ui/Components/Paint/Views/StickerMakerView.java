@@ -1185,12 +1185,12 @@ public class StickerMakerView extends FrameLayout implements NotificationCenter.
             currentAccount = account;
 
             if (currentAccount >= 0 && isAttachedToWindow()) {
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploaded);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadProgressChanged);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadFailed);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingFailed);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingStarted);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileNewChunkAvailable);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploaded);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadProgressChanged);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadFailed);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingFailed);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingStarted);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileNewChunkAvailable);
             }
         }
     }
@@ -1212,12 +1212,12 @@ public class StickerMakerView extends FrameLayout implements NotificationCenter.
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
 
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploaded);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadProgressChanged);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadFailed);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingFailed);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingStarted);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileNewChunkAvailable);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadProgressChanged);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadFailed);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingFailed);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingStarted);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileNewChunkAvailable);
     }
 
     @Override

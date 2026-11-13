@@ -230,7 +230,7 @@ public class VoIPPreNotificationService { // } extends Service implements AudioM
             PendingIntent.getActivity(
                 context,
                 0,
-                new Intent(context, LaunchActivity.class).setAction("voip_answer"),
+                new Intent(context, LaunchActivity.class).setAction("voip_answer").putExtra(LaunchActivity.EXTRA_VOIP_ANSWER_TOKEN, LaunchActivity.VOIP_ANSWER_TOKEN),
                 PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_CANCEL_CURRENT
             );
 
@@ -506,7 +506,16 @@ public class VoIPPreNotificationService { // } extends Service implements AudioM
         currentState = null;
         final int account = pendingVoIP.getIntExtra("account", UserConfig.selectedAccount);
         if (VoIPService.getSharedInstance() != null) {
-            VoIPService.getSharedInstance().acceptIncomingCall();
+            if (VoIPService.getSharedInstance().isIncomingCallLocked()) {
+                FileLog.d("VoIPPreNotification.answer(): masked call is locked, opening call UI for PIN");
+                try {
+                    PendingIntent.getActivity(context, 0, new Intent(context, LaunchActivity.class).setAction("voip"), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE).send();
+                } catch (PendingIntent.CanceledException e) {
+                    FileLog.e(e);
+                }
+            } else {
+                VoIPService.getSharedInstance().acceptIncomingCall();
+            }
         } else {
             pendingVoIP.putExtra("openFragment", true);
             if (

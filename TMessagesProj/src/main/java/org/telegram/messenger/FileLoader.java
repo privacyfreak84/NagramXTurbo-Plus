@@ -12,6 +12,7 @@ import android.text.TextUtils;
 import android.util.SparseArray;
 
 import org.telegram.tgnet.ConnectionsManager;
+import tw.nekomimi.nekogram.helpers.HiddenChatsHelper;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stories;
@@ -121,7 +122,7 @@ public class FileLoader extends BaseController {
         }
     }
 
-    public DispatchQueue getFileLoaderQueue() {
+    public DispatchQueue2 getFileLoaderQueue() {
         return fileLoaderQueue;
     }
 
@@ -205,7 +206,7 @@ public class FileLoader extends BaseController {
 
     public final static int PRELOAD_CACHE_TYPE = 11;
 
-    private volatile static DispatchQueue fileLoaderQueue = new DispatchQueue("fileUploadQueue");
+    private volatile static DispatchQueue2 fileLoaderQueue = new DispatchQueue2("fileUploadQueue");
     private final FilePathDatabase filePathDatabase;
 
     private final LinkedList<FileUploadOperation> uploadOperationQueue = new LinkedList<>();
@@ -1132,7 +1133,8 @@ public class FileLoader extends BaseController {
                 }
             }
 
-            if (SaveToGallerySettingsHelper.needSave(flag, metadata, messageObject, currentAccount)) {
+            long hiddenCheckDialogId = messageObject != null ? messageObject.getDialogId() : (metadata != null ? metadata.dialogId : 0);
+            if (SaveToGallerySettingsHelper.needSave(flag, metadata, messageObject, currentAccount) && !HiddenChatsHelper.isInvisibleDialog(currentAccount, hiddenCheckDialogId)) {
                 return true;
             }
         }

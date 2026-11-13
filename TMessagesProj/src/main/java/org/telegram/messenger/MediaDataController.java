@@ -115,6 +115,7 @@ import java.util.regex.Pattern;
 
 import tw.nekomimi.nekogram.NekoConfig;
 import tw.nekomimi.nekogram.helpers.EntitiesHelper;
+import tw.nekomimi.nekogram.helpers.HiddenChatsHelper;
 import xyz.nextalone.nagram.NaConfig;
 
 @SuppressWarnings("unchecked")
@@ -3983,7 +3984,7 @@ public class MediaDataController extends BaseController {
                     req.flags |= 1;
                 }
                 if (replyMessageId != 0) {
-                    if (dialogId == getUserConfig().getClientUserId() || getMessagesStorage().isMonoForum(queryWithDialog)) {
+                    if (dialogId == getUserConfig().getClientUserId() || getMessagesController().isMonoForum(queryWithDialog)) {
                         req.saved_peer_id = getMessagesController().getInputPeer(replyMessageId);
                         req.flags |= 4;
                     } else {
@@ -4069,7 +4070,7 @@ public class MediaDataController extends BaseController {
             }, true);
         }
         if (lastReplyMessageId != 0) {
-            if (queryWithDialog == getUserConfig().getClientUserId() || getMessagesStorage().isMonoForum(queryWithDialog)) {
+            if (queryWithDialog == getUserConfig().getClientUserId() || getMessagesController().isMonoForum(queryWithDialog)) {
                 req.saved_peer_id = getMessagesController().getInputPeer(lastReplyMessageId);
                 req.flags |= 4;
             } else {
@@ -5003,7 +5004,7 @@ public class MediaDataController extends BaseController {
         });
     }
 
-    public void loadMusic(long dialogId, long maxId, long minId) {
+    public void loadMusic(long dialogId, long topicId, long maxId, long minId) {
         getMessagesStorage().getStorageQueue().postRunnable(() -> {
             ArrayList<MessageObject> arrayListBegin = new ArrayList<>();
             ArrayList<MessageObject> arrayListEnd = new ArrayList<>();
@@ -5011,7 +5012,9 @@ public class MediaDataController extends BaseController {
                 for (int a = 0; a < 2; a++) {
                     ArrayList<MessageObject> arrayList = a == 0 ? arrayListBegin : arrayListEnd;
                     SQLiteCursor cursor;
-                    if (a == 0) {
+                    if (topicId != 0) {
+                        cursor = getMessagesStorage().getDatabase().queryFinalized(String.format(Locale.US, "SELECT data, mid FROM media_topics WHERE uid = %d AND topic_id = %d AND mid %s %d AND type = %d ORDER BY date DESC, mid DESC LIMIT 1000", dialogId, topicId, a == 0 ? "<" : ">", a == 0 ? maxId : minId, MEDIA_MUSIC));
+                    } else if (a == 0) {
                         if (!DialogObject.isEncryptedDialog(dialogId)) {
                             cursor = getMessagesStorage().getDatabase().queryFinalized(String.format(Locale.US, "SELECT data, mid FROM media_v4 WHERE uid = %d AND mid < %d AND type = %d ORDER BY date DESC, mid DESC LIMIT 1000", dialogId, maxId, MEDIA_MUSIC));
                         } else {
@@ -5043,7 +5046,7 @@ public class MediaDataController extends BaseController {
             } catch (Exception e) {
                 FileLog.e(e);
             }
-            AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.musicDidLoad, dialogId, arrayListBegin, arrayListEnd));
+            AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.musicDidLoad, dialogId, arrayListBegin, arrayListEnd, topicId));
         });
     }
     //---------------- MEDIA END ----------------
@@ -5070,6 +5073,9 @@ public class MediaDataController extends BaseController {
         ArrayList<TLRPC.TL_topPeer> hintsFinal = new ArrayList<>();
         if (SharedConfig.passcodeHash.length() <= 0) {
             for (int a = 0; a < hints.size(); a++) {
+                if (HiddenChatsHelper.isInvisibleDialog(currentAccount, DialogObject.getPeerDialogId(hints.get(a).peer))) {
+                    continue;
+                }
                 hintsFinal.add(hints.get(a));
                 if (hintsFinal.size() == maxShortcuts - 2) {
                     break;

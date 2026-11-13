@@ -23,6 +23,19 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 
 ## Features
 
+### Hidden chats (PIN zone)
+- Hide chats behind a PIN: "Hide chat" in the chat menu (or multi-select) — the chat disappears from the list, unread counters, search and forwarding targets until the zone is unlocked
+- Unlock: long-press the Chats tab (folder popup item) — password or fingerprint; optional hold gesture on the Chats tab toggles the zone instead — hold 5 seconds to show, 2 seconds to hide (off by default, the folders popup stays untouched then)
+- While unlocked the Chats tab is struck through; leaving the app or the auto-lock timer re-hides everything instantly
+- Notifications and incoming calls of hidden chats are masked: normal / without content / pseudonym / silent; a masked call shows a pseudonym instead of the name and a password button to reveal it
+- Pseudonyms: one per chat plus a standard one — used on calls and notifications instead of real names
+- Zone settings: password, fingerprint, auto-lock timer, notification and call modes, the hidden chats manager (search, pseudonyms, unhide) and a red "Reset hidden chats" action that wipes the zone back to its pre-setup state
+- Screenshots are blocked while the zone is unlocked or a hidden chat is open; PIN guessing is slowed down after repeated wrong tries
+- Off by default: nothing appears anywhere until a password is set
+
+- Calls: the call screen now follows the system auto-rotate on phones, like on tablets — turn auto-rotate off to keep it portrait
+- Video calls: new button near the call controls cycles how the peer's video fits the screen — full frame with black bars or edge-to-edge fill; the choice is remembered, pinch zoom keeps its scale when you let go, and your own preview thumbnail is no longer cropped
+
 ### Settings
 - Download speed boost (Turbo → Network, off by default): lifts download limits to Premium level, so big files download faster without a Premium subscription; stories, audio and secret-chat files download faster too. Experimental: server limits may sometimes slow downloads back down
 - One place for all Turbo settings: a dedicated Turbo section in the Nagram X settings — app icon picker, input bar (iOS), action button style, media viewer, forwarding, deleted messages and fonts now live together
@@ -113,6 +126,7 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Builds for `arm64-v8a` (64-bit) and `armeabi-v7a` (32-bit); in-app update auto-picks the matching APK by device arch
 
 ## Fixes
+- Video calls on landscape tablets: the outgoing video is upright for the peer, the self-preview is no longer flipped or cropped, and the incoming video is no longer rotated sideways
 - Text selection Copy works again after the 13.1.1 update — the item was there but did nothing; restricted chats now hide Copy in the base build only
 - Turbo → Network now holds both speed settings together, download and upload, with clear names; the upload boost previously hid in the experimental Neko settings under a misleading label
 - Bold text in messages looks properly bold again on devices where the system font has no separate medium weight (common on Chinese ROMs), matching Nagram X; custom fonts without a bold variant now get a synthetic bold too
@@ -159,9 +173,13 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Uploading videos and GIFs on mobile data no longer hangs forever when the connection silently drops: a frozen upload restarts itself, and after a few failed tries shows an error you can retry
 - Cancelling a video or GIF that is still converting or uploading no longer marks the message with a red error
 - Sending a video shows its processing progress — "Processing video… 74%" in the chat and in the upload notification — instead of a size counter that looks stuck
+- Upload progress ("12 / 125 MB" on the media) is visible again during the whole upload, for videos in high quality and for any file: an internal mix-up in timestamps suppressed the live progress after the 13.2.1 update, so the counter only flashed at the very end
+- Processing progress on a sending video renders again after the 13.2.1 update; high-quality videos no longer show a fake 0% processing state and keep the size counter instead
+- Videos with VP8/VP9 video tracks now play in-app on devices without a hardware decoder for them: the software decoder was built in but never matched by name; Dolby Vision base layers also benefit
+- If a video fails to play, the viewer now silently retries once on the other decoding pipeline (hardware ↔ software) with the position kept before offering the external player dialog
+- The attach panel no longer shows an empty gap between the article and contact buttons for premium users
 - A video upload no longer hangs forever when the video itself stops converting: after 90 seconds without progress the message shows an honest error you can retry, and the stuck conversion is cancelled
 - Saving several deleted media to the gallery in a row no longer slows down with each item: a save now gives its current download time to recover instead of piling on new requests
 - Removed the "Download Speed Boost" experimental setting — it had no effect after the 13.0.2 update and only made downloads hit server rate limits sooner
 - Fixed chats with old last messages staying hidden from the chat list until you scrolled it all the way to the bottom — the list now finishes loading by itself
 - Chat list stays reliable on flaky connections: the app no longer floods the server during the chat list sync (which could make it reset the local cache), and after any reset the list picks loading back up by itself instead of silently stopping
-- Video calls on tablets: the person you call no longer sees your video rotated sideways when you hold the tablet in landscape — outgoing video now follows the device orientation, also when screen rotation is locked

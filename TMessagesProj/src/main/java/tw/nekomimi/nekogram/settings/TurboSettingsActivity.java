@@ -76,9 +76,9 @@ import org.telegram.ui.Components.BlurredRecyclerView;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProviderThemed;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSource;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceWrapped;
+import org.telegram.utils.glass.source.GlassSource;
+import org.telegram.utils.glass.source.GlassSourceColor;
+import org.telegram.utils.glass.source.GlassSourceWrapped;
 import org.telegram.ui.Components.chat.WallpaperBitmapProvider;
 import org.telegram.ui.Components.ActionButtonStyle;
 import org.telegram.ui.LaunchActivity;
@@ -94,6 +94,7 @@ import java.util.List;
 import tw.nekomimi.nekogram.NekoConfig;
 import tw.nekomimi.nekogram.config.ConfigItem;
 import tw.nekomimi.nekogram.config.CellGroup;
+import tw.nekomimi.nekogram.helpers.HiddenChatsHelper;
 import tw.nekomimi.nekogram.config.cell.AbstractConfigCell;
 import tw.nekomimi.nekogram.config.cell.ConfigCellCustom;
 import tw.nekomimi.nekogram.config.cell.ConfigCellDivider;
@@ -952,7 +953,6 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
         return false;
     }
 
-    @Override
     protected void onCustomCellClick(View view, int position, float x, float y) {
         if (position == cellGroup.rows.indexOf(fontRegularRow)) {
             presentFragment(new FontPickerActivity(TypefaceHelper.FONT_CATEGORY_REGULAR));
@@ -1452,13 +1452,13 @@ public class TurboSettingsActivity extends BaseNekoXSettingsActivity implements 
             lastIsBlurEnabled = isBlurEnabled;
             lastIsLiquidGlassEnabled = isLiquidGlassEnabled;
 
-            BlurredBackgroundSource source;
+            GlassSource source;
             if (isBlurEnabled && wallpaper != null) {
                 source = wallpaperBitmapProvider.updateSourceFromBackgroundViewDrawable(wallpaper);
             } else {
-                source = new BlurredBackgroundSourceColor();
+                source = new GlassSourceColor();
             }
-            BlurredBackgroundSourceWrapped wrappedSource = new BlurredBackgroundSourceWrapped();
+            GlassSourceWrapped wrappedSource = new GlassSourceWrapped();
             wrappedSource.setSource(source);
             glassFactory = new BlurredBackgroundDrawableViewFactory(wrappedSource);
             colorProvider = new BlurredBackgroundColorProviderThemed(resourcesProvider, Theme.key_chat_messagePanelBackground);
