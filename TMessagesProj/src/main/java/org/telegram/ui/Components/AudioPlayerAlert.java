@@ -3749,10 +3749,7 @@ public class AudioPlayerAlert extends BottomSheet implements NotificationCenter.
                 speedItems[a].setColors(c, c);
             }
         }
-        if (castItem != null) {
-            castItem.setEnabledByColor(castItemButton != null && castItemButton.isConnected(), getThemedColor(Theme.key_actionBarDefaultSubmenuItem), getThemedColor(Theme.key_actionBarDefaultSubmenuItemIcon), getThemedColor(Theme.key_featuredStickers_addButton));
-            castItem.setSelectorColor(castItemButton != null && castItemButton.isConnected() ? Theme.multAlpha(getThemedColor(Theme.key_featuredStickers_addButton), .10f) : getThemedColor(Theme.key_listSelector));
-        }
+        // Chromecast item is not part of this Google-free build.
     }
 
     private boolean delegateColorsApplied;
