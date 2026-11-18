@@ -3185,7 +3185,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     }
                 }
                 needHideProgress(false);
-            }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin | ConnectionsManager.RequestFlagTryDifferentDc | ConnectionsManager.RequestFlagEnableUnauthorized);
+            }), ConnectionsManager.RequestFlagDoNotWaitFloodWait | ConnectionsManager.RequestFlagWithoutLogin | ConnectionsManager.RequestFlagTryDifferentDc | ConnectionsManager.RequestFlagEnableUnauthorized);
             needShowProgress(reqId);
         }
 

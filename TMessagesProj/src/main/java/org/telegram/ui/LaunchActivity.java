@@ -624,6 +624,20 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                             case "chat":
                                 if (args != null) {
                                     ChatActivity chat = new ChatActivity(args);
+                                    long topicId = savedInstanceState.getLong("topic_id");
+                                    long chatId = args.getLong("chat_id");
+                                    if (topicId != 0 && chatId != 0) {
+                                        TLRPC.Chat currentChat = MessagesController.getInstance(currentAccount).getChat(chatId);
+                                        if (ChatObject.isForum(currentChat) && !ChatObject.areTabsEnabled(currentChat) && !ChatObject.isSidebarEnabled(currentChat)) {
+                                            Bundle topicsArgs = new Bundle();
+                                            topicsArgs.putLong("chat_id", chatId);
+                                            BaseFragment topicsOrChat = TopicsFragment.getTopicsOrChat(this, topicsArgs);
+                                            if (topicsOrChat instanceof TopicsFragment) {
+                                                actionBarLayout.addFragmentToStack(topicsOrChat);
+                                            }
+                                        }
+                                        ForumUtilities.applyTopic(chat, MessagesStorage.TopicKey.of(-chatId, topicId));
+                                    }
                                     if (actionBarLayout.addFragmentToStack(chat)) {
                                         chat.restoreSelfArgs(savedInstanceState);
                                     }
@@ -1618,6 +1632,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             }
         }
         boolean pushOpened = false;
+        boolean pushFromNotification = false;
         long push_user_id = 0;
         long push_chat_id = 0;
         long[] push_story_dids = null;
@@ -3037,6 +3052,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 } else if (intent.getAction().equals("new_dialog")) {
                     open_new_dialog = 1;
                 } else if (intent.getAction().startsWith("com.tmessages.openchat")) {
+                    pushFromNotification = true;
 //                    Integer chatIdInt = intent.getIntExtra("chatId", 0);
                     long chatId = intent.getLongExtra("chatId", 0);
 //                    Integer userIdInt = intent.getIntExtra("userId", 0);
@@ -3158,9 +3174,24 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                         VoIPPendingCall.startOrSchedule(this, push_user_id, videoCallUser, AccountInstance.getInstance(intentAccount[0]));
                     }
                 } else {
-                    pushOpened = resolveAndOpenUserChat(intentAccount[0], push_user_id, push_msg_id);
+                    if (pushFromNotification) {
+                        Bundle args = new Bundle();
+                        args.putLong("user_id", push_user_id);
+                        if (push_msg_id != 0) {
+                            args.putInt("message_id", push_msg_id);
+                        }
+                        if (mainFragmentsStack.isEmpty() || MessagesController.getInstance(intentAccount[0]).checkCanOpenChat(args, mainFragmentsStack.get(mainFragmentsStack.size() - 1))) {
+                            ChatActivity fragment = new ChatActivity(args);
+                            if (getActionBarLayout().presentFragment(new INavigationLayout.NavigationParams(fragment).setNoAnimation(true))) {
+                                pushOpened = true;
+                                LaunchActivity.dismissAllWeb();
+                            }
+                        }
+                    } else {
+                        pushOpened = resolveAndOpenUserChat(intentAccount[0], push_user_id, push_msg_id);
+                    }
                 }
-            } else if (push_chat_id != 0 && MessagesController.getInstance(intentAccount[0]).getChat(push_chat_id) == null) {
+            } else if (push_chat_id != 0 && !pushFromNotification && MessagesController.getInstance(intentAccount[0]).getChat(push_chat_id) == null) {
                 pushOpened = resolveAndOpenBasicChat(intentAccount[0], push_chat_id, push_msg_id);
             } else if (push_chat_id != 0) {
                 Bundle args = new Bundle();
@@ -3713,6 +3744,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             if (resolved) {
                 Bundle args = new Bundle();
                 args.putLong("user_id", userId);
+                if (messageId != 0) {
+                    args.putInt("message_id", messageId);
+                }
                 if (mainFragmentsStack.isEmpty() || messagesController.checkCanOpenChat(args, mainFragmentsStack.get(mainFragmentsStack.size() - 1))) {
                     if (getActionBarLayout().presentFragment(new INavigationLayout.NavigationParams(new ChatActivity(args)).setNoAnimation(true))) {
                         LaunchActivity.dismissAllWeb();
@@ -8792,6 +8826,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 if (lastFragment instanceof ChatActivity && args != null) {
                     outState.putBundle("args", args);
                     outState.putString("fragment", "chat");
+                    ChatActivity chatActivity = (ChatActivity) lastFragment;
+                    if (chatActivity.isTopic && chatActivity.getChatMode() == 0) {
+                        outState.putLong("topic_id", chatActivity.getTopicId());
+                    }
                 } else if (lastFragment instanceof GroupCreateFinalActivity && args != null) {
                     outState.putBundle("args", args);
                     outState.putString("fragment", "group");

@@ -4,6 +4,23 @@ Differences between Nagram X Turbo and [Nagram X](https://github.com/risin42/Nag
 
 ## Upstream
 
+Synced with Telegram 13.2.2. User-visible from upstream since 13.2.1:
+- Calls: connection setup is faster and more reliable — call signaling data is delivered immediately instead of waiting for the UI queue
+- Round video messages (camera circles): recording pipeline reworked — more stable recording and playback
+- Chat widgets: the widget engine now runs in an isolated process with no access to app data
+- Message menu: "Stop live location" for your own ongoing location broadcasts
+- Location screen: the title sits on a glass pill over the map, like the map buttons
+- Login: code requests are no longer blocked by short rate limits
+
+Synced with Telegram 13.2.1. User-visible from upstream since 13.1.1:
+- Protected chats: reply to a message from its context menu; Save-to-Gallery hidden in the selection menu
+- Popup notifications: the close button follows the theme color
+- Fullscreen landscape video: the navigation bar no longer reserves empty space over the player
+- Motion photos can be edited with full permissions
+- Fixed: playback speed icon lagging one step behind in release builds
+- Fixed: crash on themes without window animations (adaptive dialogs)
+- Channel DMs: Ban and Unban are offered correctly for non-subscribers
+
 Synced with Telegram 13.1.1. User-visible from upstream since 13.0.3:
 - Private chats with restricted sharing: Copy is now hidden in the text selection menu
 - Protected chats: photos pasted inside text messages now respect content restrictions
@@ -126,6 +143,11 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Builds for `arm64-v8a` (64-bit) and `armeabi-v7a` (32-bit); in-app update auto-picks the matching APK by device arch
 
 ## Fixes
+- Profile buttons around the avatar are white again in day mode when avatar blur is disabled — they no longer take the theme accent color
+- Saved Messages: the sub-chat sidebar button in the header works again — since 13.2.1 the centered-title mode left it non-clickable; tapping it now pulls out the sub-chat panel
+- Saved Messages: swiping on a message bubble makes a quote again — the sub-chat sidebar now pulls out only from empty space or beside a bubble, not over messages
+- Chats open from notifications without an error after the app was restarted in the background — the chat opens directly, like in the official app, instead of a network lookup that failed on an empty cache
+- The premium status icon no longer shows at the top of the Archive; the main screen is unchanged
 - Video calls on landscape tablets: the outgoing video is upright for the peer, the self-preview is no longer flipped or cropped, and the incoming video is no longer rotated sideways
 - Text selection Copy works again after the 13.1.1 update — the item was there but did nothing; restricted chats now hide Copy in the base build only
 - Turbo → Network now holds both speed settings together, download and upload, with clear names; the upload boost previously hid in the experimental Neko settings under a misleading label
