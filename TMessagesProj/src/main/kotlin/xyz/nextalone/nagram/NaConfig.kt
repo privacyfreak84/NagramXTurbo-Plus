@@ -1558,6 +1558,12 @@ object NaConfig {
             ConfigItem.configTypeBool,
             false
         )
+    val disableComplexAnimations =
+        addConfig(
+            "DisableComplexAnimations",
+            ConfigItem.configTypeBool,
+            false
+        )
     val disableInAppBrowserGestures =
         addConfig(
             "DisableInAppBrowserGestures",
@@ -1982,6 +1988,9 @@ object NaConfig {
                 }
             }
             configLoaded = true
+            if (!getPreferences().contains(disableComplexAnimations.getKey()) && SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
+                disableComplexAnimations.setConfigBool(true)
+            }
         }
     }
 

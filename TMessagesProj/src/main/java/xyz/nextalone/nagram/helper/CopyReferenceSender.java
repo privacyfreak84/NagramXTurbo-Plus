@@ -39,6 +39,9 @@ public class CopyReferenceSender {
                 || messageObject.isVoiceOnce() || messageObject.isRoundOnce()) {
             return false;
         }
+        if (messageObject.messageOwner.rich_message != null) {
+            return false;
+        }
         if (!REFERENCE_PROTECTED_SUPPORTED && messageObject.messageOwner.noforwards) {
             return false;
         }
@@ -165,14 +168,6 @@ public class CopyReferenceSender {
                 !withSound, scheduleDate, target.monoForumPeerId, fallback);
     }
 
-    public static boolean sendByReference(int currentAccount, ArrayList<MessageObject> messages,
-                                          long targetDialogId, MessageObject replyTopMsg,
-                                          boolean notify, int scheduleDate, long monoForumPeerId) {
-        return sendByReference(currentAccount, messages,
-                new CopySendQueue.CopySendQueueTarget(targetDialogId, replyTopMsg, monoForumPeerId),
-                null, null, null, notify, scheduleDate);
-    }
-
     private static boolean dispatchReferenceSend(int currentAccount, ArrayList<MessageObject> messages,
                                                  long targetDialogId, MessageObject replyTopMsg,
                                                  boolean silent, int scheduleDate, long monoForumPeerId,
@@ -289,7 +284,7 @@ public class CopyReferenceSender {
         return request;
     }
 
-    private static TLRPC.InputReplyTo buildInputReplyTo(int currentAccount, MessageObject replyTopMsg, long monoForumPeerId) {
+    static TLRPC.InputReplyTo buildInputReplyTo(int currentAccount, MessageObject replyTopMsg, long monoForumPeerId) {
         if (monoForumPeerId != 0) {
             if (replyTopMsg != null) {
                 TLRPC.TL_inputReplyToMessage replyTo = new TLRPC.TL_inputReplyToMessage();

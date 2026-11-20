@@ -96,6 +96,8 @@ import tw.nekomimi.nekogram.filters.AyuFilter;
 import tw.nekomimi.nekogram.parts.MessageTransKt;
 import xyz.nextalone.nagram.NaConfig;
 import xyz.nextalone.nagram.helper.CopyReferenceSender;
+import xyz.nextalone.nagram.helper.CopySendQueue;
+import xyz.nextalone.nagram.helper.RichCopySender;
 
 public class MessageHelper extends BaseController {
 
@@ -1293,8 +1295,15 @@ public class MessageHelper extends BaseController {
     }
 
     public boolean sendMessageAsCopy(MessageObject messageObject, MessageObject.GroupedMessages messageGroup, long targetDialogId, MessageObject replyTo, MessageObject replyToTopMsg, ChatActivity.ReplyQuote quote, boolean notify, int scheduleDate, int mode, String quickReplyShortcut, int quickReplyShortcutId, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        return sendMessageAsCopy(messageObject, messageGroup, targetDialogId, replyTo, replyToTopMsg, quote, notify, scheduleDate, mode, quickReplyShortcut, quickReplyShortcutId, payStars, monoForumPeerId, suggestionParams, null, null, null);
+    }
+
+    public boolean sendMessageAsCopy(MessageObject messageObject, MessageObject.GroupedMessages messageGroup, long targetDialogId, MessageObject replyTo, MessageObject replyToTopMsg, ChatActivity.ReplyQuote quote, boolean notify, int scheduleDate, int mode, String quickReplyShortcut, int quickReplyShortcutId, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams, MessageObject editableMessage, String editedText, ArrayList<TLRPC.MessageEntity> editedEntities) {
         if (messageObject == null || messageObject.messageOwner == null) {
             return false;
+        }
+        if (!BuildVars.TURBO_BASE && quote == null && messageObject.messageOwner.rich_message != null) {
+            return RichCopySender.sendRichCopy(currentAccount, messageObject, targetDialogId, replyTo != null ? replyTo : replyToTopMsg, notify, scheduleDate, monoForumPeerId);
         }
         SendMessageChatArguments sendMessageChatArguments = createSendMessageChatArguments(quickReplyShortcut, quickReplyShortcutId);
         CharSequence caption = ChatActivity.getMessageCaption(messageObject, messageGroup, null);
@@ -1309,7 +1318,11 @@ public class MessageHelper extends BaseController {
         if (isGifSentByReference || CopyReferenceSender.canDispatchByReference(currentAccount, messageObject)) {
             ArrayList<MessageObject> single = new ArrayList<>();
             single.add(messageObject);
-            if (CopyReferenceSender.sendByReference(currentAccount, single, targetDialogId, replyTo != null ? replyTo : replyToTopMsg, notify, scheduleDate, monoForumPeerId)) {
+            boolean editedHere = editedText != null && messageObject == editableMessage;
+            if (CopyReferenceSender.sendByReference(currentAccount, single,
+                    new CopySendQueue.CopySendQueueTarget(targetDialogId, replyTo != null ? replyTo : replyToTopMsg, monoForumPeerId),
+                    editedHere ? editableMessage : null, editedHere ? editedText : null, editedHere ? editedEntities : null,
+                    notify, scheduleDate)) {
                 return true;
             }
         }
@@ -1348,16 +1361,24 @@ public class MessageHelper extends BaseController {
 
 
     public boolean sendMessagesAsCopy(ArrayList<MessageObject> messages, long targetDialogId, MessageObject replyTo, MessageObject replyToTopMsg, ChatActivity.ReplyQuote quote, boolean notify, int scheduleDate, int mode, String quickReplyShortcut, int quickReplyShortcutId, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        return sendMessagesAsCopy(messages, targetDialogId, replyTo, replyToTopMsg, quote, notify, scheduleDate, mode, quickReplyShortcut, quickReplyShortcutId, payStars, monoForumPeerId, suggestionParams, null, null, null);
+    }
+
+    public boolean sendMessagesAsCopy(ArrayList<MessageObject> messages, long targetDialogId, MessageObject replyTo, MessageObject replyToTopMsg, ChatActivity.ReplyQuote quote, boolean notify, int scheduleDate, int mode, String quickReplyShortcut, int quickReplyShortcutId, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams, MessageObject editableMessage, String editedText, ArrayList<TLRPC.MessageEntity> editedEntities) {
         if (messages == null || messages.isEmpty()) {
             return false;
         }
         if (!canSendMessagesAsCopy(messages)) {
             return false;
         }
+        if (!BuildVars.TURBO_BASE && quote == null && messages.size() == 1 && messages.get(0).messageOwner != null && messages.get(0).messageOwner.rich_message != null) {
+            return sendMessageAsCopy(messages.get(0), null, targetDialogId, replyTo, replyToTopMsg, quote, notify, scheduleDate, mode, quickReplyShortcut, quickReplyShortcutId, payStars, monoForumPeerId, suggestionParams, editableMessage, editedText, editedEntities);
+        }
         HashSet<Long> referenceCapableGroupIds = CopyReferenceSender.resolveFullyReferenceCapableGroupIds(messages);
         for (int i = 0; i < messages.size(); i++) {
             MessageObject messageObject = messages.get(i);
-            boolean needsFile = messageObject != null && messageObject.messageOwner != null && !messageObject.isSticker() && !messageObject.isAnimatedSticker() && !messageObject.isAnimatedEmoji() &&
+            boolean isRichPost = messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.rich_message != null;
+            boolean needsFile = !isRichPost && messageObject != null && messageObject.messageOwner != null && !messageObject.isSticker() && !messageObject.isAnimatedSticker() && !messageObject.isAnimatedEmoji() &&
                     (messageObject.isPhoto() || messageObject.isVideo() || messageObject.isRoundVideo() || messageObject.getDocument() != null);
             if (needsFile && TextUtils.isEmpty(getPathToMessage(messageObject, currentAccount))
                     && !(quote == null && CopyReferenceSender.canRouteWithoutDownload(messageObject, referenceCapableGroupIds))) {
@@ -1365,7 +1386,7 @@ public class MessageHelper extends BaseController {
             }
         }
         ArrayList<MessageObject> remainingMessages = new ArrayList<>(messages);
-        sendReferenceCapableMessages(remainingMessages, targetDialogId, replyToTopMsg, quote, notify, scheduleDate, monoForumPeerId);
+        sendReferenceCapableMessages(remainingMessages, targetDialogId, replyToTopMsg, quote, notify, scheduleDate, monoForumPeerId, editableMessage, editedText, editedEntities);
         boolean sentAny = remainingMessages.size() < messages.size();
         if (remainingMessages.isEmpty()) {
             return sentAny;
@@ -1376,7 +1397,8 @@ public class MessageHelper extends BaseController {
 
         for (int i = 0; i < remainingMessages.size(); i++) {
             MessageObject messageObject = remainingMessages.get(i);
-            boolean batchMedia = messageObject != null && messageObject.messageOwner != null && !messageObject.isRoundVideo() && (messageObject.isPhoto() || messageObject.isVideo());
+            boolean isRichPost = messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.rich_message != null;
+            boolean batchMedia = !isRichPost && messageObject != null && messageObject.messageOwner != null && !messageObject.isRoundVideo() && (messageObject.isPhoto() || messageObject.isVideo());
             if (batchMedia) {
                 String path = getPathToMessage(messageObject, currentAccount);
                 long groupId = messageObject.getGroupIdForUse();
@@ -1401,7 +1423,7 @@ public class MessageHelper extends BaseController {
                     media = null;
                     currentGroupId = 0;
                 }
-                if (sendMessageAsCopy(messageObject, null, targetDialogId, replyTo, replyToTopMsg, quote, notify, scheduleDate, mode, quickReplyShortcut, quickReplyShortcutId, payStars, monoForumPeerId, suggestionParams)) {
+                if (sendMessageAsCopy(messageObject, null, targetDialogId, replyTo, replyToTopMsg, quote, notify, scheduleDate, mode, quickReplyShortcut, quickReplyShortcutId, payStars, monoForumPeerId, suggestionParams, editableMessage, editedText, editedEntities)) {
                     sentAny = true;
                 }
             }
@@ -1413,7 +1435,7 @@ public class MessageHelper extends BaseController {
         return sentAny;
     }
 
-    private void sendReferenceCapableMessages(ArrayList<MessageObject> messages, long targetDialogId, MessageObject replyToTopMsg, ChatActivity.ReplyQuote quote, boolean notify, int scheduleDate, long monoForumPeerId) {
+    private void sendReferenceCapableMessages(ArrayList<MessageObject> messages, long targetDialogId, MessageObject replyToTopMsg, ChatActivity.ReplyQuote quote, boolean notify, int scheduleDate, long monoForumPeerId, MessageObject editableMessage, String editedText, ArrayList<TLRPC.MessageEntity> editedEntities) {
         if (quote != null) {
             return;
         }
@@ -1427,8 +1449,12 @@ public class MessageHelper extends BaseController {
             }
             if (groupId != 0) {
                 ArrayList<MessageObject> group = new ArrayList<>(messages.subList(index, groupEnd));
+                boolean editedHere = editedText != null && editableMessage != null && group.contains(editableMessage);
                 if (CopyReferenceSender.canSendGroupByReference(group)
-                        && CopyReferenceSender.sendByReference(currentAccount, group, targetDialogId, replyToTopMsg, notify, scheduleDate, monoForumPeerId)) {
+                        && CopyReferenceSender.sendByReference(currentAccount, group,
+                        new CopySendQueue.CopySendQueueTarget(targetDialogId, replyToTopMsg, monoForumPeerId),
+                        editedHere ? editableMessage : null, editedHere ? editedText : null, editedHere ? editedEntities : null,
+                        notify, scheduleDate)) {
                     messages.subList(index, groupEnd).clear();
                     continue;
                 }
@@ -1437,7 +1463,11 @@ public class MessageHelper extends BaseController {
                 if (CopyReferenceSender.canDispatchByReference(currentAccount, messageObject)) {
                     ArrayList<MessageObject> single = new ArrayList<>();
                     single.add(messageObject);
-                    if (CopyReferenceSender.sendByReference(currentAccount, single, targetDialogId, replyToTopMsg, notify, scheduleDate, monoForumPeerId)) {
+                    boolean editedHere = editedText != null && messageObject == editableMessage;
+                    if (CopyReferenceSender.sendByReference(currentAccount, single,
+                            new CopySendQueue.CopySendQueueTarget(targetDialogId, replyToTopMsg, monoForumPeerId),
+                            editedHere ? editableMessage : null, editedHere ? editedText : null, editedHere ? editedEntities : null,
+                            notify, scheduleDate)) {
                         messages.remove(index);
                         continue;
                     }
@@ -1483,6 +1513,9 @@ public class MessageHelper extends BaseController {
         }
         if (messageObject.type == MessageObject.TYPE_CONTACT || messageObject.type == MessageObject.TYPE_GEO) {
             return false;
+        }
+        if (messageObject.messageOwner.rich_message != null) {
+            return true;
         }
         return messageObject.type == MessageObject.TYPE_TEXT || messageObject.isAnimatedEmoji() || messageObject.isSticker() || messageObject.isAnimatedSticker() || messageObject.isPhoto() || messageObject.isVideo() || messageObject.getDocument() != null || ChatActivity.getMessageCaption(messageObject, null, null) != null;
     }

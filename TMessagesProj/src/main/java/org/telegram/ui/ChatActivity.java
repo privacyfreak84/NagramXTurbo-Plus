@@ -294,6 +294,7 @@ import org.telegram.ui.Components.Premium.GiftPremiumBottomSheet;
 import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.Premium.PremiumPreviewBottomSheet;
+import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.Components.Premium.boosts.BoostDialogs;
 import org.telegram.ui.Components.Premium.boosts.GiftInfoBottomSheet;
 import org.telegram.ui.Components.Premium.boosts.PremiumPreviewGiftLinkBottomSheet;
@@ -447,6 +448,7 @@ import xyz.nextalone.nagram.helper.DoubleTap;
 import xyz.nextalone.nagram.helper.ForwardEditedTextSender;
 import xyz.nextalone.nagram.helper.ForwardTextEditMode;
 import xyz.nextalone.nagram.helper.ForwardTextEdit;
+import xyz.nextalone.nagram.helper.RichCopySender;
 import xyz.nextalone.nagram.helper.ProtectedForward;
 
 @SuppressWarnings("unchecked")
@@ -22587,7 +22589,7 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private boolean isSkeletonVisible() {
-        if (justCreatedTopic || justCreatedChat || currentUser != null || chatListView == null || !SharedConfig.animationsEnabled() || !getLiteModeChat()) {
+        if (justCreatedTopic || justCreatedChat || currentUser != null || chatListView == null || !SharedConfig.animationsEnabled() || !getLiteModeChat() || NaConfig.INSTANCE.getDisableComplexAnimations().Bool()) {
             return false;
         }
         int childHeight = 0;
@@ -34863,10 +34865,19 @@ public class ChatActivity extends BaseFragment implements
                 }
 
                 if (GroupedIconsView.useGroupedIcons()) {
-                    popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
-
                     var groupedIconsView = new GroupedIconsView(getContext(), ChatActivity.this, selectedObject, this.lastMessageMenuStatus.allowReply, this.lastMessageMenuStatus.allowReplyPm, this.lastMessageMenuStatus.allowEdit, this.lastMessageMenuStatus.allowDelete, this.lastMessageMenuStatus.allowForward, this.lastMessageMenuStatus.allowCopy, this.lastMessageMenuStatus.allowCopyPhoto, this.lastMessageMenuStatus.allowCopyLink, this.lastMessageMenuStatus.allowCopyLinkPm);
-                    popupLayout.addView(groupedIconsView.linearLayout);
+                    LinearLayout stickyBottomBar = new LinearLayout(contentView.getContext());
+                    stickyBottomBar.setOrientation(LinearLayout.VERTICAL);
+                    stickyBottomBar.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
+                    stickyBottomBar.addView(groupedIconsView.linearLayout);
+                    stickyBottomBar.measure(View.MeasureSpec.makeMeasureSpec(dp(1000), View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                    if (popupLayout.getScrollView() != null) {
+                        popupLayout.getScrollView().setPadding(0, 0, 0, stickyBottomBar.getMeasuredHeight());
+                    }
+                    popupLayout.addView(stickyBottomBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
+                    if (popupLayout.getSwipeBack() != null) {
+                        popupLayout.getSwipeBack().addOnSwipeBackProgressListener((layout, toProgress, progress) -> stickyBottomBar.setAlpha(1f - progress));
+                    }
                 }
 
             }
@@ -35195,11 +35206,8 @@ public class ChatActivity extends BaseFragment implements
                 popupX += location[0];
             }
             int totalHeight = contentView.getHeight();
+            totalHeight -= windowInsetsStateHolder.getCurrentNavigationBarInset() > AndroidUtilities.dp(8) ? (windowInsetsStateHolder.getCurrentNavigationBarInset() - AndroidUtilities.dp(8)) : 0;
             int height = scrimPopupContainerLayout.getMeasuredHeight() + AndroidUtilities.dp(48);
-            int keyboardHeight = contentView.measureKeyboardHeight();
-            if (keyboardHeight > AndroidUtilities.dp(20)) {
-                totalHeight += keyboardHeight;
-            }
             int popupY;
             int minY = (int) (chatListView.getY() + dp(24));
             int maxY = totalHeight - height - dp(8);
@@ -37600,6 +37608,37 @@ public class ChatActivity extends BaseFragment implements
         return forwardTextEditMode.isEntered();
     }
 
+    public void startForwardRichEdit() {
+        if (BuildVars.TURBO_BASE || messagePreviewParams == null || messagePreviewParams.forwardMessages == null) {
+            return;
+        }
+        ArrayList<MessageObject> selectedMessages = new ArrayList<>();
+        messagePreviewParams.forwardMessages.getSelectedMessages(selectedMessages);
+        if (selectedMessages.size() != 1) {
+            return;
+        }
+        MessageObject source = selectedMessages.get(0);
+        if (source == null || source.messageOwner == null || source.messageOwner.rich_message == null) {
+            return;
+        }
+        presentFragment(new RichEditor(source.messageOwner.rich_message)
+                .setChatActivity(this)
+                .setOnForwardCopyReady(edited -> {
+                    if (getMessagesController().richEditorAllowed()) {
+                        RichCopySender.sendRichCopy(currentAccount, edited, source, getDialogId(), getThreadMessage(), true, 0, getSendMonoForumPeerId());
+                        return;
+                    }
+                    Activity activity = getParentActivity();
+                    if (activity == null || activity.isFinishing()) {
+                        return;
+                    }
+                    RichEditor.openConversionSheet(activity,
+                        () -> RichCopySender.sendRichAsText(currentAccount, edited, source, getDialogId(), true, 0, getSendMonoForumPeerId()),
+                        () -> new PremiumFeatureBottomSheet(activity, PremiumPreviewFragment.PREMIUM_FEATURE_RICH_EDITOR, true, null).show(),
+                        null);
+                }));
+    }
+
     public void toggleForwardTextEditMode() {
         if (forwardTextEditMode.isEntered()) {
             forwardTextEditMode.exit();
@@ -37630,9 +37669,15 @@ public class ChatActivity extends BaseFragment implements
             forwardTextEditMode.exit();
             return;
         }
+        MessageObject carrier = ForwardTextEdit.getEditableMessage(messagesToForward);
+        if (carrier == null) {
+            forwardTextEditMode.exit();
+            return;
+        }
+        final MessageObject editedCarrier = carrier;
         CharSequence comment = forwardTextEditMode.getSavedText();
         boolean hasComment = comment != null && comment.length() > 0;
-        if (!forwardTextEditMode.isTextChanged(editedText)) {
+        if (!ForwardTextEdit.hasForwardTextChanged(editedText != null ? editedText.toString() : "", editedCarrier)) {
             if (AlertsCreator.checkSlowMode(getParentActivity(), currentAccount, getDialogId(), hasComment)) {
                 return;
             }
@@ -37661,7 +37706,7 @@ public class ChatActivity extends BaseFragment implements
             createUndoView();
             return;
         }
-        if (ForwardTextEdit.isTextOnlyMessage(editableMessage) && editedText.toString().trim().isEmpty()) {
+        if (ForwardTextEdit.isTextOnlyMessage(editedCarrier) && editedText.toString().trim().isEmpty()) {
             forwardTextEditMode.flashCopyNotice();
             return;
         }
@@ -37677,7 +37722,7 @@ public class ChatActivity extends BaseFragment implements
             messagePreviewParams = null;
             forbidForwardingWithDismiss = false;
             hideFieldPanel(true);
-            ForwardEditedTextSender.send(getParentActivity(), getResourceProvider(), currentAccount, messagesToForward, targets, comment, commentEntities, editableMessage, editedText, editedEntities, notify, scheduleDate, scheduleRepeatPeriod);
+            ForwardEditedTextSender.send(getParentActivity(), getResourceProvider(), currentAccount, messagesToForward, targets, comment, commentEntities, editedCarrier, editedText, editedEntities, notify, scheduleDate, scheduleRepeatPeriod);
             createUndoView();
         };
         if (!BuildVars.TURBO_BASE && ProtectedForward.containsProtected(messagesToForward)

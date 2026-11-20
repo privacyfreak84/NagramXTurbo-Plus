@@ -289,6 +289,9 @@ public class CopySendQueue implements NotificationCenter.NotificationCenterDeleg
     }
 
     private boolean needsFileForCopy(MessageObject messageObject) {
+        if (messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.rich_message != null) {
+            return false;
+        }
         return messageObject != null && messageObject.messageOwner != null
                 && !messageObject.isSticker() && !messageObject.isAnimatedSticker() && !messageObject.isAnimatedEmoji()
                 && (messageObject.isPhoto() || messageObject.isVideo() || messageObject.isRoundVideo() || messageObject.getDocument() != null);
@@ -703,7 +706,7 @@ public class CopySendQueue implements NotificationCenter.NotificationCenterDeleg
             return MessageHelper.getInstance(currentAccount).sendMessagesAsCopy(messages, target.dialogId, null, target.replyTopMsg, null, withSound, scheduleDate, 0, null, 0, 0, target.monoForumPeerId, null);
         }
         return ForwardTextEdit.withEditedText(editableMessage, editedText, editedEntities, () ->
-                MessageHelper.getInstance(currentAccount).sendMessagesAsCopy(messages, target.dialogId, null, target.replyTopMsg, null, withSound, scheduleDate, 0, null, 0, 0, target.monoForumPeerId, null));
+                MessageHelper.getInstance(currentAccount).sendMessagesAsCopy(messages, target.dialogId, null, target.replyTopMsg, null, withSound, scheduleDate, 0, null, 0, 0, target.monoForumPeerId, null, editableMessage, editedText, editedEntities));
     }
 
     private void sendComment(CharSequence comment, ArrayList<TLRPC.MessageEntity> commentEntities, CopySendQueueTarget target, boolean withSound, int scheduleDate, int scheduleRepeatPeriod) {

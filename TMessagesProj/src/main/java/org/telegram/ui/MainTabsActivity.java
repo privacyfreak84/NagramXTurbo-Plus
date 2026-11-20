@@ -72,7 +72,6 @@ import org.telegram.ui.Components.FolderDrawable;
 import org.telegram.ui.Components.HintsController;
 import org.telegram.ui.Components.HiddenChatsHoldProgressView;
 import org.telegram.ui.Components.ItemOptions;
-import org.telegram.ui.Components.HiddenChatsPasscodeDialog;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
@@ -606,18 +605,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private void toggleHiddenChatsVisibility() {
-        if (HiddenChatsHelper.isUnlocked(currentAccount)) {
-            HiddenChatsHelper.markLocked(currentAccount, "toggle-off");
-            BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.HiddenChatsHiddenToast)).show();
-        } else if (HiddenChatsHelper.hasPinForAccount(currentAccount)) {
-            HiddenChatsHelper.requestUnlock(getContext(), LocaleController.getString(R.string.HiddenChatsEnterPassword), () -> {
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.HiddenChatsShownToast)).show();
-            });
-        } else {
-            new HiddenChatsPasscodeDialog(getContext(), LocaleController.getString(R.string.HiddenChatsSetupHint), (java.util.function.Consumer<String>) pin -> {
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.HiddenChatsSetupDoneToast)).show();
-            }).show();
-        }
+        HiddenChatsHelper.toggleVisibility(this);
         updateChatsTabStrike();
     }
 
@@ -1288,9 +1276,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private void checkUi_tabsPosition() {
         if (tabsView == null) return;
         if (NaConfig.INSTANCE.getHideBottomNavigationBar().Bool()) {
+            tabsViewWrapper.setVisibility(View.GONE);
             tabsView.setVisibility(View.GONE);
             return;
         }
+        tabsViewWrapper.setVisibility(View.VISIBLE);
         final boolean isUpdateLayoutVisible = updateLayoutWrapper.isUpdateLayoutVisible();
         final int updateLayoutHeight = isUpdateLayoutVisible ? dp(UpdateLayoutWrapper.HEIGHT) : 0;
         final int normalY = -(updateLayoutHeight);

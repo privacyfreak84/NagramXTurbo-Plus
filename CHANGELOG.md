@@ -39,9 +39,16 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Bots: new type labels (Agent, Game, App, AI)
 
 ## Features
+- A single "Disable complex animations" toggle (Turbo → Animations, enabled out of the box on low-performance devices) turns off the heavy per-frame effects — the profile avatar "droplet" effect, screen-open blur snapshots, fireworks and message loading skeletons
+- The "Blur and glass" row next to it mirrors Telegram's own blur/liquid-glass power-saving switches in both directions — change it here or in Power Saving, they stay in sync
+- Posts with rich formatting (structured posts with media inside the body) can now be forwarded as copies — without the author, with media sent by reference instead of re-uploading; the forward toggles work on them again
+- The hide-caption toggle on rich posts now sends just the media — a single item or an album, still without re-uploading
+- Editing the text of a rich post when forwarding now opens the rich editor with the post's content prefilled
+- Rich posts mixed with regular messages in one multi-select forward are all handled correctly now
 
 ### Hidden chats (PIN zone)
 - Hide chats behind a PIN: "Hide chat" in the chat menu (or multi-select) — the chat disappears from the list, unread counters, search and forwarding targets until the zone is unlocked
+- With the bottom tab bar hidden, a "Hidden chats" item appears in the chat list menu (⋮) — the same show/hide toggle as the tab hold gesture, so the zone stays reachable without the tab bar
 - Unlock: long-press the Chats tab (folder popup item) — password or fingerprint; optional hold gesture on the Chats tab toggles the zone instead — hold 5 seconds to show, 2 seconds to hide (off by default, the folders popup stays untouched then)
 - While unlocked the Chats tab is struck through; leaving the app or the auto-lock timer re-hides everything instantly
 - Notifications and incoming calls of hidden chats are masked: normal / without content / pseudonym / silent; a masked call shows a pseudonym instead of the name and a password button to reveal it
@@ -143,6 +150,11 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Builds for `arm64-v8a` (64-bit) and `armeabi-v7a` (32-bit); in-app update auto-picks the matching APK by device arch
 
 ## Fixes
+- The action button row at the bottom of the message context menu (reply/copy/forward) stays pinned to the bottom of the popup — the item list scrolls above it and the row no longer disappears in tall menus
+- Message context menu is no longer cut off at the bottom of the screen on devices with the three-button navigation bar — the whole menu stays visible and its items can always be reached
+- Group join request buttons no longer overlap in Russian and other long languages — when they don't fit one row, "Add to group" and "Ban" fill the first row and "Dismiss" sits centered below, in the chat banner and the full requests list alike
+- Settings and Calls tabs work properly with the bottom tab bar hidden — the screen no longer jitters or ignores taps, the build-number menu at the bottom opens, and the extra empty space under the list is gone
+- Forwarding with edited text no longer intermittently sends the original caption — the edit now survives a background retry of the send
 - Profile buttons around the avatar are white again in day mode when avatar blur is disabled — they no longer take the theme accent color
 - Saved Messages: the sub-chat sidebar button in the header works again — since 13.2.1 the centered-title mode left it non-clickable; tapping it now pulls out the sub-chat panel
 - Saved Messages: swiping on a message bubble makes a quote again — the sub-chat sidebar now pulls out only from empty space or beside a bubble, not over messages

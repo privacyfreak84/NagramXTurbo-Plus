@@ -286,6 +286,8 @@ public class RichEditor extends BaseFragment implements NotificationCenter.Notif
 
     private ChatActivity chatActivity;
     private Runnable onSentCallback;
+    private Runnable onEditorClosed;
+    private org.telegram.messenger.Utilities.Callback<TL_iv.RichMessage> onForwardCopyReady;
     private Runnable onClearedCallback;
     private boolean sent;
 
@@ -303,6 +305,16 @@ public class RichEditor extends BaseFragment implements NotificationCenter.Notif
 
     public RichEditor setOnSent(Runnable onSentCallback) {
         this.onSentCallback = onSentCallback;
+        return this;
+    }
+
+    public RichEditor setOnForwardCopyReady(org.telegram.messenger.Utilities.Callback<TL_iv.RichMessage> callback) {
+        onForwardCopyReady = callback;
+        return this;
+    }
+
+    public RichEditor setOnEditorClosed(Runnable listener) {
+        onEditorClosed = listener;
         return this;
     }
 
@@ -989,7 +1001,7 @@ public class RichEditor extends BaseFragment implements NotificationCenter.Notif
         aiStyleButton.setOnClickListener(v -> onAiStyleSelection());
         formattingLayout1.addView(aiStyleButton, LayoutHelper.createLinear(38, 38, Gravity.CENTER_VERTICAL));
 
-        final int sendIcon = editingMessageObject != null ? R.drawable.input_done : (isInScheduleMode() ? R.drawable.input_schedule : R.drawable.send_plane_24);
+        final int sendIcon = editingMessageObject != null || onForwardCopyReady != null ? R.drawable.input_done : (isInScheduleMode() ? R.drawable.input_schedule : R.drawable.send_plane_24);
         sendButton = new ChatActivityEnterView.SendButton(context, sendIcon, getResourceProvider(), true) {
             @Override
             public boolean isOpen() {
@@ -1014,9 +1026,11 @@ public class RichEditor extends BaseFragment implements NotificationCenter.Notif
         sendButton.setBackground(withShadow(sendButtonBackground));
         ScaleStateListAnimator.apply(sendButton);
         bottomPanel.addView(sendButton, LayoutHelper.createLinear(44, 44, 0, Gravity.RIGHT, 8, 0, 0, 0));
-        sendButton.setContentDescription(getString(R.string.Send));
+        sendButton.setContentDescription(getString(onForwardCopyReady != null ? R.string.Done : R.string.Send));
         sendButton.setOnClickListener(v -> sendMessage());
-        sendButton.setOnLongClickListener(this::onSendLongClick);
+        if (onForwardCopyReady == null) {
+            sendButton.setOnLongClickListener(this::onSendLongClick);
+        }
         updateSendButtonLock();
 
         container.setPadding(0, AndroidUtilities.statusBarHeight, 0, 0);
@@ -2001,6 +2015,22 @@ public class RichEditor extends BaseFragment implements NotificationCenter.Notif
     }
 
     private void sendMessage(boolean notify, int scheduleDate, int scheduleRepeatPeriod) {
+        if (onForwardCopyReady != null) {
+            if (listView.hasPendingUploads()) return;
+            ArrayList<TL_iv.PageBlock> copyBlocks = listView.flattenRowsToBlocks();
+            if (copyBlocks.isEmpty()) return;
+            TL_iv.RichMessage result = new TL_iv.RichMessage();
+            result.blocks = copyBlocks;
+            result.photos = listView.collectPhotos();
+            result.documents = listView.collectDocuments();
+            sent = true;
+            if (onSentCallback != null) {
+                onSentCallback.run();
+            }
+            onForwardCopyReady.run(result);
+            finishFragment();
+            return;
+        }
         if (isSendLocked()) {
             showConversionSheet();
             return;
@@ -2212,6 +2242,7 @@ public class RichEditor extends BaseFragment implements NotificationCenter.Notif
     }
 
     private boolean persistDraft() {
+        if (onForwardCopyReady != null) return false;
         if (chatActivity == null) return false;
         if (editingMessageObject != null) return false;
         if (!listView.canUndo()) return false;
@@ -2576,8 +2607,11 @@ public class RichEditor extends BaseFragment implements NotificationCenter.Notif
 
     @Override
     public void onFragmentDestroy() {
+        if (onEditorClosed != null) {
+            onEditorClosed.run();
+        }
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.currentUserPremiumStatusChanged);
-        if (!persistedDraftOnEnd) {
+        if (!persistedDraftOnEnd && onForwardCopyReady == null) {
             persistDraft();
             persistedDraftOnEnd = true;
         }

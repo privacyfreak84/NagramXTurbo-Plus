@@ -245,4 +245,8 @@
     <string name="DwellForwardListEmptyHint">No chats yet. Tap \"Add chat\" to pick one.</string>
     <string name="DwellForwardAddChat">Add chat</string>
     <string name="DwellForwardListFull">This list is full.</string>
+    <string name="AnimationsSettings">Animations</string>
+    <string name="DisableComplexAnimations">Disable complex animations</string>
+    <string name="BlurAndGlass">Blur and glass</string>
+    <string name="BlurAndGlassAbout">Synced with the power saving settings.</string>
 </resources>

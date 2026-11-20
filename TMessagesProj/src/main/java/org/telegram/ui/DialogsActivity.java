@@ -9154,7 +9154,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void prepareBlurBitmap() {
-        if (blurredView == null) {
+        if (blurredView == null || NaConfig.INSTANCE.getDisableComplexAnimations().Bool()) {
             return;
         }
         int w = (int) (fragmentView.getMeasuredWidth() / 9.0f);
@@ -13752,6 +13752,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 io.add(R.drawable.menu_recent, getString(R.string.RecentChats), () -> {
                     io.dismiss();
                     BackButtonMenuRecent.show(currentAccount, this, optionsItem);
+                });
+            }
+            if (hideBottomNavigationBar && !BuildVars.TURBO_BASE && HiddenChatsHelper.isFeatureAvailable(currentAccount)) {
+                io.add(R.drawable.msg_secret_solar, getString(R.string.HiddenChats), () -> {
+                    io.dismiss();
+                    HiddenChatsHelper.toggleVisibility(this);
                 });
             }
             if (hideBottomNavigationBar && NaConfig.INSTANCE.getHideArchive().Bool()) {
