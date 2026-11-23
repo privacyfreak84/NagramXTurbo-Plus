@@ -39,6 +39,7 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Bots: new type labels (Agent, Game, App, AI)
 
 ## Features
+- A "Hide pinned messages" toggle (Turbo → Chat Settings, off by default) removes the pinned messages bar at the top of the chat
 - A single "Disable complex animations" toggle (Turbo → Animations, enabled out of the box on low-performance devices) turns off the heavy per-frame effects — the profile avatar "droplet" effect, screen-open blur snapshots, fireworks and message loading skeletons
 - The "Blur and glass" row next to it mirrors Telegram's own blur/liquid-glass power-saving switches in both directions — change it here or in Power Saving, they stay in sync
 - Posts with rich formatting (structured posts with media inside the body) can now be forwarded as copies — without the author, with media sent by reference instead of re-uploading; the forward toggles work on them again
@@ -150,6 +151,13 @@ Synced with Telegram 13.0.3. User-visible from upstream since 13.0.2:
 - Builds for `arm64-v8a` (64-bit) and `armeabi-v7a` (32-bit); in-app update auto-picks the matching APK by device arch
 
 ## Fixes
+- Message input: the pencil formatting menu showed "LOC_ERR:null" instead of Cut, Copy and Paste on every language — these items now have their proper titles and actually cut, copy and paste the selected text
+- Message input: with "Use Input Menu" disabled there is no empty gap next to the send button while typing — the space reserved for the hidden attach icon is reclaimed (most visible in right-to-left layouts)
+- Tablets: reactions chips no longer disappear after rotating the device in posts with media albums
+- Tablets: message height and quote background in posts with media albums now recalculate correctly when the device is rotated — no empty tail under the bubble and no missing quote background
+- Settings: the version row at the very bottom is fully visible again when the bottom tab bar is hidden — the list gets a small bottom clearance it lost with the phantom padding removal
+- Hidden chats: password setup works again on a fresh install — the setup dialog was verifying a password instead of creating one after the toggle moved into the helper, so every new install hit "wrong password" on the create screen; the Password row in settings also offers to create a password when none is set, a mismatched confirmation reports "Passwords do not match" instead of "wrong password", and the dots no longer look pre-filled
+- Settings: with the bottom tab bar hidden, the profile picture no longer gets stuck mid-scroll and the screen stops twitching — on setups with a short settings list (premium section hidden, single account, non-default display size) the list gets the scroll room it was missing
 - The action button row at the bottom of the message context menu (reply/copy/forward) stays pinned to the bottom of the popup — the item list scrolls above it and the row no longer disappears in tall menus
 - Message context menu is no longer cut off at the bottom of the screen on devices with the three-button navigation bar — the whole menu stays visible and its items can always be reached
 - Group join request buttons no longer overlap in Russian and other long languages — when they don't fit one row, "Add to group" and "Ban" fill the first row and "Dismiss" sits centered below, in the chat banner and the full requests list alike

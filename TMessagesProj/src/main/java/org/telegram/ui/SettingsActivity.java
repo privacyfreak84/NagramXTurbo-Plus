@@ -361,7 +361,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         };
         search.loadFaqWebPage();
 
-        listView = new UniversalRecyclerView(this, this::fillItems, this::onClick, this::onLongClick);
+        listView = new UniversalRecyclerView(this, (items, adapter) -> {
+            fillItems(items, adapter);
+            AndroidUtilities.runOnUIThread(this::updateAvatarScrollRoom);
+        }, this::onClick, this::onLongClick);
         listView.setCaptureSectionsDecoratorAllowed(true);
         listView.adapter.setApplyBackground(false);
         listView.setSections();
@@ -724,11 +727,16 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         if (avatarGooey == null || searchItem != null && searchItem.isSearchFieldVisible2() || avatarHideShown <= 0 || avatarHideShown >= 1) {
             return;
         }
+        int dy;
         if (avatarHideShown >= 0.5f) {
-            listView.smoothScrollBy(0, (int) -(avatarShownY - avatarListY), CubicBezierInterpolator.EASE_OUT_QUINT);
+            dy = (int) -(avatarShownY - avatarListY);
         } else {
-            listView.smoothScrollBy(0, (int) Math.ceil(avatarListY - avatarHiddenY), CubicBezierInterpolator.EASE_OUT_QUINT);
+            dy = (int) Math.ceil(avatarListY - avatarHiddenY);
         }
+        if (dy > 0 && !listView.canScrollVertically(1) || dy < 0 && !listView.canScrollVertically(-1)) {
+            return;
+        }
+        listView.smoothScrollBy(0, dy, CubicBezierInterpolator.EASE_OUT_QUINT);
     }
 
     /** Top of the list item holding {@code view}, in the list. */
@@ -1141,14 +1149,33 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
     private int navigationBarHeight;
     private int additionNavigationBarHeight;
+    private int settingsBottomClearance;
 
     @NonNull
     private WindowInsetsCompat onApplyWindowInsets(@NonNull View v, @NonNull WindowInsetsCompat insets) {
         final Insets systemInsets = AndroidUtilities.getDefaultWindowInsets(insets, false);
         navigationBarHeight = systemInsets.bottom;
+        settingsBottomClearance = dp(24);
         updateActionBarFadeHeight(systemInsets.top);
-        BaseFragmentSimpleGlass.setListViewParams(listView, systemInsets.top, systemInsets.bottom, dp(12), additionNavigationBarHeight);
+        BaseFragmentSimpleGlass.setListViewParams(listView, systemInsets.top, systemInsets.bottom, dp(12), additionNavigationBarHeight + settingsBottomClearance);
+        listView.post(this::updateAvatarScrollRoom);
         return WindowInsetsCompat.CONSUMED;
+    }
+
+    private void updateAvatarScrollRoom() {
+        if (listView == null) {
+            return;
+        }
+        int needed = (int) (listView.getPaddingTop() + dp(87));
+        int basePaddingBottom = navigationBarHeight + additionNavigationBarHeight + settingsBottomClearance;
+        int currentExcess = Math.max(0, listView.getPaddingBottom() - basePaddingBottom);
+        int maxScroll = Math.max(0, listView.computeVerticalScrollRange() - listView.getHeight() - currentExcess);
+        int excess = Math.max(0, needed - maxScroll);
+        int room = Math.max(excess, settingsBottomClearance);
+        if (Math.abs(room - currentExcess) <= dp(1)) {
+            return;
+        }
+        listView.setPadding(0, listView.getPaddingTop(), 0, basePaddingBottom + room);
     }
 
     public static class AccountCell extends LinearLayout implements Theme.Colorable {
