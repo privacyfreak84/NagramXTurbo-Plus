@@ -4941,7 +4941,7 @@ public class ChatActivity extends BaseFragment implements
             } else {
                 allowShowPinned = false;
             }
-            if (allowShowPinned) {
+            if (allowShowPinned && !NaConfig.INSTANCE.getHidePinnedMessagesBar().Bool()) {
                 headerItem.lazilyAddSubItem(nkheaderbtn_show_pinned, R.drawable.msg_pin, LocaleController.getString("PinnedMessage", R.string.PinnedMessage));
             }
             if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
@@ -30876,6 +30876,16 @@ public class ChatActivity extends BaseFragment implements
 
     private void updatePinnedMessageView(boolean animated, int animateToNext) {
         if (currentEncryptedChat != null || chatMode != 0) {
+            return;
+        }
+        if (NaConfig.INSTANCE.getHidePinnedMessagesBar().Bool()) {
+            boolean changed = hidePinnedMessageView(animated);
+            if (headerItem != null) {
+                headerItem.hideSubItem(nkheaderbtn_show_pinned);
+            }
+            if (changed) {
+                checkListViewPaddings();
+            }
             return;
         }
         int pinned_msg_id;
