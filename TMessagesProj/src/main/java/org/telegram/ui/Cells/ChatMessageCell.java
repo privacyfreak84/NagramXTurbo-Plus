@@ -1404,6 +1404,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     public int firstVisiblePollButton = -1, lastVisiblePollButton = -1;
     public float resultsPollButtonOffset;
     private boolean reactionsVisible = true;
+    private boolean visiblePartDispatched;
     boolean pollVoted;
     boolean pollClosed;
     boolean pollResultsPreview;
@@ -5631,6 +5632,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         int blurredViewBottomOffset,
         int position2
     ) {
+        visiblePartDispatched = true;
         this.childPosition = position;
         this.visibleHeight = height;
         this.visibleParent = parent;
@@ -5752,6 +5754,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
         }
 
+        updateReactionsVisibility();
+    }
+
+    private void updateReactionsVisibility() {
         final boolean reactionsVisible = intersect(reactionsLayoutInBubble.y, reactionsLayoutInBubble.y + reactionsLayoutInBubble.height, childPosition, childPosition + visibleHeight);
         if (this.reactionsVisible != reactionsVisible) {
             this.reactionsVisible = reactionsVisible;
@@ -9833,7 +9839,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                             }
                             if ((currentPosition.flags & MessageObject.POSITION_FLAG_LEFT) != 0 && currentCaption != null) {
                                 currentMessagesGroup.cachedWidthForCaption = widthForCaption;
-                            } else if (currentMessagesGroup.cachedWidthForCaption > 0) {
+                                currentMessagesGroup.cachedWidthForCaptionDWidth = dWidth;
+                            } else if (currentMessagesGroup.cachedWidthForCaption > 0 && currentMessagesGroup.cachedWidthForCaptionDWidth == dWidth) {
                                 widthForCaption = currentMessagesGroup.cachedWidthForCaption;
                             }
                         }
@@ -14388,11 +14395,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 right = getBackgroundDrawableRight() + transitionParams.deltaRight;
             } else {
                 int end, dWidth;
-                if (AndroidUtilities.isTablet()) {
-                    dWidth = AndroidUtilities.getMinTabletSide();
-                } else {
-                    dWidth = getParentWidth();
-                }
+                dWidth = getGroupPhotosWidth();
                 int firstLineWidth = 0;
                 for (int a = 0; a < currentMessagesGroup.posArray.size(); a++) {
                     MessageObject.GroupedMessagePosition position = currentMessagesGroup.posArray.get(a);
@@ -19420,11 +19423,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             right = getBackgroundDrawableRight() + transitionParams.deltaRight;
         } else {
             int end, dWidth;
-            if (AndroidUtilities.isTablet()) {
-                dWidth = AndroidUtilities.getMinTabletSide();
-            } else {
-                dWidth = getParentWidth();
-            }
+            dWidth = getGroupPhotosWidth();
             int firstLineWidth = 0;
             for (int a = 0; a < currentMessagesGroup.posArray.size(); a++) {
                 MessageObject.GroupedMessagePosition position = currentMessagesGroup.posArray.get(a);
@@ -21655,6 +21654,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     public void drawReactionsLayout(Canvas canvas, float alpha, Integer only) {
         if (isRoundVideo) {
             reactionsLayoutInBubble.drawServiceShaderBackground = 1f - getVideoTranscriptionProgress();
+        }
+        if (visiblePartDispatched && hasReactionsToDraw()) {
+            updateReactionsVisibility();
         }
         if (reactionsVisible && hasReactionsToDraw()) {
             if (reactionsLayoutInBubble.drawServiceShaderBackground > 0) {
