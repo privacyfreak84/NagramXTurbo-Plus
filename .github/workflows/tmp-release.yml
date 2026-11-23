@@ -1,0 +1,49 @@
+name: Temp release and cleanup
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+      tag:
+        required: true
+      sha:
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n Staging -D out
+          find out -type f
+          cat > notes.md <<'NOTES'
+          This release merges the latest upstream Nagram X Turbo dev changes.
+
+          New:
+          - A Turbo setting hides the pinned messages bar.
+
+          Fixes:
+          - When the input menu is off, the attach button gets its slot back.
+          - When the input menu is off, the text indent does not flash on the first keystroke.
+          - Cut, copy and paste work in the pencil format menu.
+          - On tablets, reaction chips stay visible after you rotate the device.
+          - On tablets, the album caption width and the quote width are correct.
+          - The hidden chats pin setup works, and the settings version row has the correct space.
+          - When the tab bar is hidden, the settings avatar does not stick.
+
+          Other:
+          - The app does not use Google services. All earlier fork changes stay in this release.
+          - The fork's stable key signs this release. You can install it over the previous release.
+
+          CI built this release from commit 96757b4. CI shows that the code compiles and packages. Nobody tested the merge on a device.
+          NOTES
+          APKS=$(find out -name '*.apk')
+          gh release create "$TAG" $APKS -R "$GITHUB_REPOSITORY" --target "$SHA" --title "NagramXTurbo-Plus $TAG" --notes-file notes.md
